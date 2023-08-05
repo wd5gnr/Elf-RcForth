@@ -1,7 +1,8 @@
 RcForth forth-doc.txt
 By Mike Riley
 
-Last update : 24 May 2022  Glenn Jolly
+Previous  update : 24 May 2022  Glenn Jolly
+Last update: 3 Aug 2023 Al Williams
 
 Note on stack representation:
 -----------------------------
@@ -11,6 +12,14 @@ is executed, symbols after the -- represent the stack after execution.
 The top of stack is to the right. Example:  (1 2 -- 3) This shows that 2
 is on the top of the stack, and 1 is 2nd from the top, after the instruction
 is executed 3 will be on the stack, the 1 and 2 will be consumed.
+
+Numbers
+-------
+NN - positive number in current BASE
+-NN - negative decimal number (when BASE=10)
+0xNN - unsigned hex number (any BASE; x is not case sensitive)
+0#nn - unsigned decimal number (any BASE)
+
 
 Arithmetic Operators:
 ---------------------
@@ -96,7 +105,13 @@ SAVE     ( -- )           - Save dictionary to terminal via Xmodem
 LOAD     ( -- )           - Load dictionary to terminal via Xmodem
 BLOAD    ( -- )           - Load extensions as binary block included in src code
 GOTOXY   (x y -- )        - Position the cursor at x,y
-RAND     ( -- b)          - Returns random byte 
+RAND     ( -- b)          - Returns random byte
+EXEC     ( a -- r )       - Do an SCRT call to machine language at address a; Value of RB on return pushed on stack
+OUT      ( b p -- )       - Output byte b to port p (e.g., 4 0xaa out)
+INP      ( p -- b )       - Input byte b from port p
+EF       ( -- v )         - Read value of EF pins
+SETQ     ( x -- )         - Set q to value x
+BYE      ( -- )           - Exit
 
 
 Extended Functions:
@@ -386,6 +401,70 @@ now run it:
     **
     ***
     ****
+
+
+You can create and call machine language routines, but you have to be careful not to corrupt things.
+When in doubt, save things to the stack and return them to how you found them before exiting.
+You will be called using the normal subroutine call with a stack already in place.
+
+The easiest way to do it is create a variable with enough space to hold your code and then load it.
+
+For example, to create 16 bytes to hold code:
+
+hex
+variable pgm
+10 allot
+
+You can define some helper words:
+: code! ( a byte -- a+1 ) swap dup rot swap c! !+ ;
+
+This leaves the address for the next call so it is clean to define a word to stop the sequence:
+: endcode ( a -- ) drop ;
+
+Let's write AA to the LEDs using the following code:
+
+SEX R3  ; make X=P
+OUT 4   ; write M(X) RX+1 (that is write the next byte)
+DB AA   ; the byte to write
+SEX R2  ; back to X=2
+D5      ; SCRT return (SEP R5)
+
+In hex, this is E3 64 AA E2 D5, which is 5 bytes. We can fit it in our pgm variable or define a variable with enough space.
+
+Issue the following (be sure you are in hex mode):
+
+pgm e3 code! 64 code! aa code! e2 code! d5 code! endcode
+
+If you want to verify:
+pgm 10 dump
+
+Now, we can call our code and drop the return value since we don't care about it. Fun fact. If your code doesn't touch the return code it is the call
+address. So you can make multiple calls without reloading the address as long as your codes doesn't touch the return value register (RB).
+
+pgm exec drop
+
+You could make that into a word, of course:
+: mlpgm pgm exec drop ;
+
+You can call many BIOS calls
+variable bioskey
+10 allot
+bioskey f8 code! 0 code! bb code! d4 code! ff code!
+6 code! ab code! d5! endcode
+
+This corresponds to:
+LDI 0 ; zero out top byte of return register
+PHI RB
+CALL bios_key  ; read key (BIOS ff06)
+PLO RB         ; put key in RB.0
+RETURN
+
+In this case we want the return code:
+bioskey exec .
+
+You can define a word to drop the return code for the cases that you don't care:
+: exec_ exec drop ;
+
 
 This completes this introductory tutorial on Forth.  Experiment with the
 commands and you will find it is really easy to pick it up!

@@ -14,6 +14,8 @@
 ;[RLA]   rcasm doesn't have any way to do a logical "OR" of assembly
 ;[RLA} options, so define a master "ANYROM" option that's true for
 ;[RLA} any of the ROM conditions...
+	
+	;; [gnr] Bug fixes, assembler fixes,and the Exec word
 
 #ifdef MCHIP
 #define ANYROM
@@ -64,9 +66,9 @@ exitaddr:  equ     08003h
 ; [GDJ] build: asm02 -i -L -DSTGROM forth.asm
 #ifdef STGROM
 #define    ANYROM 1
-;#define    CODE    0A600H  ; [GDJ] no longer fits in current ROM arrangement
-#define    CODE    02000H
-#define    XMODEM  0F000H
+	include config.inc
+#define CODE FORTH  		; [gnr] [GDG] says now bigger than 15 pages
+	; [gnr] The UART is used in inkey so when using bitbang, no inkey!
 #define    UART_SELECT   6             ; UART register select I/O port
 #define    UART_DATA     7             ; UART data I/O port
 
@@ -98,7 +100,6 @@ stack:     equ     00ffh
 exitaddr:  equ     o_wrmboot
 #endif
 
-include    ops.inc
 include    bios.inc
 
 #ifdef ELFOS
@@ -177,6 +178,7 @@ FALLOT:    equ     FKEYQ+1
 FERROR:    equ     FALLOT+1
 FSEE:      equ     FERROR+1
 FFORGET:   equ     FSEE+1
+FEXEC:	   equ     FFORGET+1
 
 T_NUM:     equ     255
 T_ASCII:   equ     254
@@ -341,7 +343,9 @@ nextbase:  lda     rc
 
            lbr     mainlp
 
-old:       ldi     low himem           ; memory pointer
+old: 	   ldi     high himem	; [gnr] fix up r9 since this might be entry point
+	   phi     r9
+	   ldi     low himem           ; memory pointer
            plo     r9                  ; place into r9
            lda     r9                  ; retreive high memory
            phi     rb
@@ -934,6 +938,25 @@ tdotqtdn:  ldn     rb                  ; retrieve quote
 ; ------------------------------------------------------------------------
 
 notoken:   ; get number BASE [GDJ]
+	mov rc,rb
+	ldn rb
+	smi '0'
+	bnz notokenbase  	; if no leading 0 can't be 0x or 0#
+	inc rb
+	ldn rb
+	smi 'X'
+	bz notoken_0   		; 0xHexNumber
+	ldn rb
+	smi '#'
+	bnz notokenbaseadj		; 0#DecNumber
+notoken_0:
+	ldn rb
+	inc rb
+	smi 'X'
+	bz hexnum
+	br decnum
+notokenbaseadj:	  dec rb   	; point back at 0
+notokenbase:	
            mov     rd, basen
            ldn     rd
            smi     10
@@ -1046,7 +1069,7 @@ numberdn1: ldi     T_NUM               ; code to signify a number
 ; ------------------------------------------------------------------------
 ;       HEX handler  if not valid decimal then proceed to ascii          ; 
 ; ------------------------------------------------------------------------
-; [GDJ]
+				; [GDJ]
 hexnum:    ldi     0h                  ; clear return value
            plo     r7
            phi     r7
@@ -2522,8 +2545,7 @@ ckey:      sep     scall               ; go and get a key
            sep     scall               ; place key on the stack
            dw      push
            lbr     good                ; then return to caller
-
-[GDJ]
+	;; [GDJ]				
 ckeyq:     mov     r7, 0
            sep     scall               ; check for key pressed
            dw      inkey
@@ -3100,6 +3122,26 @@ delaylp2:  nop
            lbnz    delaylp1
            lbr     good
 
+	
+cexec:	   sep scall
+	   dw pop
+  	   lbdf error
+           mov     r8, jump            ; point to jump address
+           ldi     0c0h                ; lbr
+           str     r8                  ; store it
+           inc     r8
+	   ghi     rb
+           str     r8
+           inc     r8
+	   glo     rb
+           str     r8
+	   sep     scall
+	   dw      cexec0
+	;; if we return RB is pushed on stack
+	   sep scall
+	   dw push
+	   lbr good
+cexec0:	   lbr jump   		; transfer to user code. If it returns, it goes back to my scaller
 
 
 ; -----------------------------------------------------------------------------
@@ -3648,6 +3690,7 @@ cmdtable:  db      'WHIL',('E'+80h)
            db      'BLOA',('D'+80h)    ; [GDJ]
            db      'GOTOX',('Y'+80h)   ; [GDJ]
            db      'RAN',('D'+80h)     ; [GDJ]
+	   db	   'EXE',('C'+80h) 
 
            db      0                   ; no more tokens
 
@@ -3721,6 +3764,7 @@ cmdvecs:   dw      cwhile              ; 81h
            dw      cbload              ; c4h [GDJ]
            dw      cgotoxy             ; c5h [GDJ]
            dw      crand               ; c6h [GDJ]
+	   dw      cexec               ; c7h [gnr]
 
 
 ; this precompiled BASE variable is loaded at startup freemem
@@ -3732,7 +3776,7 @@ basev:  db 083h, 018h,
         db 0feh, 042h, 041h, 053h, 045h, 000h, 000h, 00ah  ; T_NUM 'BASE' VALUE
         db 000h, 000h, 000h, 000h, 000h, 000h, 000h, 000h  ; zero next word
 #else
-basev:  db 003h, 018h,
+basev:  db 003h, 018h,					   ; this must be basen+1 word
         db 07ch, 0ffh, 0c0h, 029h, 040h, 003h, 018h, 086h, ; next word address + VARIABLE
         db 0feh, 042h, 041h, 053h, 045h, 000h, 000h, 00ah, ; T_NUM 'BASE' VALUE
         db 000h, 000h, 000h, 000h, 000h, 000h, 000h, 000h  ; zero next word
