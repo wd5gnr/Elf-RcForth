@@ -2417,6 +2417,8 @@ seevname:
 	dw disp
 	lbr seevname
 seeveq:
+	sep scall
+	dw crlfout
 	;;  need to see if we need an allot here 
 	;; if [next]-2 == rb then we do not need it
 	dec rf
@@ -2437,8 +2439,6 @@ seeveq:
 	bz seevnoa            	; was equal, jump
 seevallot:	
 	;; ok we need to do the allot here
-	sep scall
-	dw crlfout
 	push rb
 	ghi rf
 	shr
@@ -2512,9 +2512,6 @@ seevdata:
 	sep sret   		; final CRLF already in place
 	
 seevnoa:	
-	ldi ' '
-	sep scall
-	dw disp
            lda     rb                  ; get value
            phi     r7
            lda     rb
@@ -2546,7 +2543,7 @@ cseefunc:  ldi     ':'                 ; start with a colon
            sep     scall               ; display character
            dw      disp
            inc     r7                  ; move address to name
-seefunclp: ldi     ' '                 ; need a spae
+seefunclp: ldi     ' '                 ; need a space
            sep     scall               ; display character
            dw      disp
            ldn     r7                  ; get next token
@@ -3524,8 +3521,6 @@ touc_qlp:  lda     rf                  ; get next character
 ; [GDJ] type out number according to selected BASE and signed/unsigned flag
 typenumind:   ; get BASE  ; enter here to have 0x or 0# put on front
         push    rf                  ; save rf for tokenizer
-	ldi 0
-	plo re  		; always unsigned here
 	ldi '0'
 	sep scall
 	dw disp
@@ -3539,6 +3534,8 @@ typenuminddec:
 	ldi '#'
 	sep scall
 	dw disp
+	ldi 0
+	plo re  		; always unsigned here
 	br typenumx
 
 typenum:   ; get BASE  ; enter here for normal output
