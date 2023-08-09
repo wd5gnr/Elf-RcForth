@@ -8,7 +8,7 @@ RcForth forth-doc.txt
 By Mike Riley
 
 Previous  update : 24 May 2022  Glenn Jolly
-Last update: 7 Aug 2023 Al Williams
+Last update: 9 Aug 2023 Al Williams
 
 What's new
 ----------
@@ -24,6 +24,9 @@ LIST dumps everything from the user dictionary in a way that it can be read back
 
 EXEC does an SCRT call to a machine language subroutime (see examples below)
 
+X. is like . but puts 0x or 0# in front depending on BASE
+
+Code size is reduced! (b2-9b = 23 pages)
 
 Note on stack representation:
 -----------------------------
@@ -103,6 +106,7 @@ ROT      (a b c -- b c a) - Rotate 3rd stack item to top
 DEPTH    ( -- a)          - Get number of items on stack
 .        (a -- )          - print top of stack as signed integer
 U.       (a -- )          - print top of stack as unsigned integer
+X.	 (a -- )          - print top of stack as unsigned integer with 0x or 0# prefix 
 EMIT     (a -- )          - print top of stack as ascii character
 EMITP    (a -- )          - print top of stack as printable character
 
@@ -578,5 +582,7 @@ commands and you will find it is really easy to pick it up!
 : .S ." < " DEPTH 8 EMIT . 8 EMIT ." > " DEPTH ?DUP IF DUP 0 DO DUP I - PICK . LOOP DROP THEN ;
 : TYPE DUP IF 0 DO DUP C@ EMITP 1 + LOOP ELSE DROP THEN DROP ;
 : DUMP CR 5 SPACES 16 0 DO I . LOOP 0 DO CR DUP . 16 0 DO DUP C@ . 1+ LOOP DUP 16 - 16 TYPE 16 +LOOP DROP CR ;
+
+
 
 ```

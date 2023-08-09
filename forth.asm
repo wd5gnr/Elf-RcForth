@@ -180,6 +180,7 @@ FSEE:      equ     FERROR+1
 FFORGET:   equ     FSEE+1
 FEXEC:	   equ     FFORGET+1
 FLIST:	   equ     FEXEC+1
+FDOTX:	   equ     FLIST+1
 
 T_NUM:     equ     255
 T_ASCII:   equ     254
@@ -443,6 +444,7 @@ crlfout:
 ; **************************************
 ; *** Display a character, char in D ***
 ; **************************************
+#if 0	
 disp:      sep     scall               ; call bios
 #ifdef ELFOS
            dw      o_type
@@ -450,10 +452,18 @@ disp:      sep     scall               ; call bios
            dw      f_type              ; function to type a charactr
 #endif
            sep     sret                ; return to caller
+#else
+#ifdef ELFOS
+	lbr o_type
+#else
+	lbr f_type
+#endif	
+#endif	
 
 ; ********************************
 ; *** Read a key, returns in D ***
 ; ********************************
+#if 0	
 getkey:    sep     scall               ; call bios
 #ifdef ELFOS
            dw      o_readkey
@@ -461,6 +471,15 @@ getkey:    sep     scall               ; call bios
            dw      f_read              ; function to read a key
 #endif
            sep     sret                ; return to caller
+#else
+getkey:
+#ifdef ELFOS
+	lbr o_readkey
+#else
+	lbr f_read
+#endif	
+#endif	
+
 
 ; ***************************************************
 ; *** Function to retrieve value from forth stack ***
@@ -971,10 +990,12 @@ notokenbase:
            smi     10
            lbnz    hexnum
 
-decnum:    mov     rd, 0               ; temp flag for minus sign
-           mov     rc,rb               ; save pointer in case of bad number
-           ldi     0                   ; clear negative flag
-           plo     re
+decnum:
+        mov     rc,rb               ; save pointer in case of bad number
+	ldi 0
+	phi rd
+	plo rd
+        plo     re
            ldn     rb                  ; get byte
            smi     '-'                 ; is it negative
            lbnz    notoken1            ; jump if not
@@ -1220,13 +1241,13 @@ execret:   sex     r2                  ; be sure X poits to stack
            phi     rf
            ldi     low msempty
            plo     rf
-execrmsg:  sep     scall
+execrmsg:  			;	sep     scall	
 #ifdef ELFOS
-           dw      o_msg
+           lbr      o_msg
 #else
-           dw      f_msg
+           lbr      f_msg
 #endif
-           sep     sret                ; return to caller
+	;;            sep     sret                ; return to caller
 
 execnum:   inc     rb                  ; point to number
            ghi     rb
@@ -1286,12 +1307,7 @@ execvar:   sep     scall               ; push var address to stack
            plo     rb
            lbr     exec                ; execute next code
            
-execdn:    sep     sret                ; return to caller
 
-error:     ldi     1                   ; indicate error
-           lbr     execret             ; return to caller
-good:      ldi     0                   ; indicate success
-           lbr     execret             ; return to caller
 
 ;          org     600h
 cdup:      sep     scall               ; pop value from forth stack
@@ -1302,7 +1318,11 @@ cdup:      sep     scall               ; pop value from forth stack
 goodpush:	
            sep     scall
            dw      push
-           lbr     good                ; return
+good:      ldi     0                   ; indicate success
+	   lskp
+error:	   ldi   1
+           lbr     execret             ; return to caller
+
 
 cdrop:     sep     scall               ; pop value from stack
            dw      pop
@@ -1329,6 +1349,7 @@ cplus:     sep     scall               ; get value from stack
            str     r2
            ghi     rb
            adc
+goodpushb:	
            phi     rb
 	   lbr     goodpush
 
@@ -1354,38 +1375,34 @@ cminus:    sep     scall               ; get value from stack
            str     r2
            ghi     rb
            smb
-           phi     rb
-	   lbr goodpush
+	   lbr goodpushb
 
 
 cdot:      sep     scall               ; get value from stack
            dw      pop
            lbdf    error               ; jump if stack was empty
            ldi     1
+typegoode:	
            plo     re                  ; signal signed int
+typegood:	
            sep     scall
            dw      typenum             ; [GDJ]
-           ; sep     scall               ; call integer out routine
-           ; dw      intout
-           ; ldi     ' '                 ; need a space
-           ; sep     scall               ; need to call character out
-           ; dw      disp
            lbr     good                ; return
 
 cudot:     sep     scall               ; get value from stack
            dw      pop
            lbdf    error               ; jump if stack was empty
            ldi     0
-           plo     re                  ; signal unsigned int
-           sep     scall               ; call integer out routine
-           dw      typenum             ; [GDJ]
-           ; sep     scall
-           ; dw      uintout
-           ; ldi     ' '                 ; need a space
-           ; sep     scall               ; need to call character out
-           ; dw      disp
-           lbr     good                ; return
+	   br typegoode
 
+cdotx:
+	sep scall
+	dw pop
+	lbdf error
+	sep scall
+	dw typenumind
+	lbr good
+	
 cand:      sep     scall               ; get value from stack
            dw      pop
            lbdf    error               ; jump if stack was empty
@@ -1406,8 +1423,7 @@ cand:      sep     scall               ; get value from stack
            str     r2
            ghi     rb
            and
-           phi     rb
-	   lbr goodpush
+	   lbr goodpushb
 
 
 cor:       sep     scall               ; get value from stack
@@ -1430,8 +1446,7 @@ cor:       sep     scall               ; get value from stack
            str     r2
            ghi     rb
            or
-           phi     rb
-	   lbr     goodpush
+	   lbr     goodpushb
 
 cxor:      sep     scall               ; get value from stack
            dw      pop
@@ -1453,8 +1468,7 @@ cxor:      sep     scall               ; get value from stack
            str     r2
            ghi     rb
            xor
-           phi     rb
-	   lbr    goodpush
+	   lbr    goodpushb
 
 
 ccr:	   sep scall
@@ -1484,10 +1498,9 @@ cswap:     sep     scall               ; get value from stack
            ghi     r8                  ; move number 
            phi     rb
            glo     r8
+goodpushb0:	
            plo     rb
-           sep     scall               ; put answer back on stack
-           dw      push
-           lbr     good                ; return
+           lbr     goodpush
 
 ci:        sep     scall               ; get value from return stack
            dw      rpop
@@ -1512,8 +1525,7 @@ cmem:      sex     r2                  ; be sure x is pointing to stack
            irx                         ; point to high byte os free mem
            ldn     r9                  ; get high byte of stack
            smb                         ; continue subtraction
-           phi     rb                  ; store answer
-	   lbr  goodpush
+	   lbr  goodpushb
 
  
 
@@ -1542,6 +1554,7 @@ cdo:       sep     scall               ; get value from stack
            plo     rb
            sep     scall               ; store inst point on return stack
            dw      rpush
+goodrpush78b:	
            ghi     r8                  ; transfer termination to rb
            phi     rb
            glo     r8
@@ -1551,7 +1564,9 @@ cdo:       sep     scall               ; get value from stack
            ghi     r7                  ; transfer count to rb
            phi     rb
            glo     r7
+goodrpushb0:	
            plo     rb
+goodrpush:	
            sep     scall
 	   dw rpush
 	   lbr good
@@ -1594,19 +1609,8 @@ loopcnt:   ghi     rb                  ; move it
            inc     ra                 
            glo     rb                  ; get rb lo value
            str     ra                  ; and write it
-           ghi     r8                  ; transfer termination
-           phi     rb
-           glo     r8
-           plo     rb
-           sep     scall               ; push onto return stack
-           dw      rpush
-           ghi     r7                  ; transfer count
-           phi     rb
-           glo     r7
-           plo     rb
-           sep     scall               ; push onto return stack
-           dw      rpush
-           lbr     good                ; and return
+	   lbr goodrpush78b
+	
 cloopdn:   sep     scall               ; pop off start of loop address
            dw      rpop
            lbr     good                ; and return
@@ -1638,10 +1642,7 @@ cbegin:    ghi     r2                  ; get copy of machine stack
            lda     ra                  ; get high of ra
            phi     rb                  ; put into rb
            lda     ra
-           plo     rb
-           sep     scall               ; store inst point on return stack
-           dw      rpush
-           lbr     good                ; and return
+	   lbr goodrpushb0
 
 ; [GDJ] corrected logic - BEGIN/UNTIL loop should repeat if flag preceding UNTIL is FALSE
 cuntil:    sep     scall               ; get top of stack
@@ -1678,9 +1679,7 @@ crgt:      sep     scall               ; get value from return stack
 cgtr:      sep     scall               ; get value from stack
            dw      pop
            lbdf    error               ; jump if stack was empty
-           sep     scall               ; push to return stack
-           dw      rpush
-           lbr     good                ; return to caller
+	   lbr goodrpush
 
 cunequal:  sep     scall               ; get value from stack
            dw      pop
@@ -1703,9 +1702,8 @@ cunequal:  sep     scall               ; get value from stack
            ghi     rb
            xor
            lbnz    unequal             ; jump if not equal
-           phi     rb                  ; set return result
-           plo     rb
-	   lbr goodpush
+	   plo     rb
+	   lbr goodpushb
 
 unequal:   ldi     0                   ; set return result
            phi     rb
@@ -1752,12 +1750,14 @@ cless:     sep     scall               ; get value from stack
            ghi     r8
            sdb
            phi     r7
-
-           lbnf    less1               ; DF signaled with borrow
-           mov     rb, 0
-           lbr     goodpush
-less1:     mov     rb, 1
-	   lbr goodpush 
+gooddf:	
+	ldi 0
+	phi rb  		; no matter what
+	lsnf
+	ldi 1			; now D=0 if DF=0 or 1 if DF=1
+	plo rb
+	lbr goodpush
+	
 
 
 
@@ -1790,18 +1790,16 @@ culess:    sep     scall               ; get value from stack
            str     r2
            ghi     r7
            sdb                         ; subtract with borrow
-           lbnf    uless1              ; DF signaled with borrow
-           mov     rb, 0
-           lbr     goodpush
-uless1:    mov     rb, 1
-	   lbr     goodpush
+	   lbr gooddf
 
 
 cwords:    ldi     high cmdtable       ; point to command table
            phi     r7                  ; put into a pointer register
            ldi     low cmdtable
            plo     r7
-           mov     rd, 0
+	ldi 0
+	phi rd
+	plo rd
 cwordslp:  lda     r7                  ; get byte
            lbz     cwordsdn            ; jump if done
            plo     rb                  ; save it
@@ -1822,7 +1820,9 @@ cwordsf:   glo     rb                  ; get byte
            glo     rd
            smi     12
            lbnz    cwordslp
-           mov     rd, 0
+	ldi 0
+	phi rd
+	plo rd
 	   sep scall
 	   dw crlfout
            lbr     cwordslp            ; and loop back
@@ -1832,7 +1832,9 @@ cwordsdn:  sep scall
            phi     r7
            ldi     low storage
            plo     r7
-           mov     rd, 0
+	ldi 0
+	phi rd
+	plo rd
 cwordslp2: lda     r7                  ; get pointer to next entry
            phi     r8                  ; put into r8
            lda     r7                  ; now pointing at type indicator
@@ -1861,7 +1863,9 @@ wordsnxt:  ldi     ' '                 ; want a space
            glo     rd
            smi     8
            lbnz    cwordslp2
-           mov     rd, 0
+	ldi 0
+	phi rd
+	plo rd
  	   sep     scall
 	   dw crlfout
            lbr     cwordslp2           ; and check next word
@@ -1871,6 +1875,7 @@ cemit:     sep     scall               ; get top of stack
            dw      pop
            lbdf    error               ; jump if error
            glo     rb                  ; get low of return value
+gooddisp:	
            sep     scall               ; and display ti
            dw      disp
            lbr     good                ; return to caller
@@ -1885,16 +1890,12 @@ cemitp:    sep     scall               ; get top of stack
            lbnf    notprint            ; jump if not printable
            glo     rb
            smi     127                 ; check for above tilde ~
-           lbdf    notprint            ; jump if not printable
-
-           glo     rb
-           lbr     emitpout            ; ok printable
-
+           lsdf               ; jump if not printable (skip 2)
+           glo     rb	      
+           lskp              ; ok printable so skip ldi .
 notprint:  ldi     '.'
+emitpout:  lbr gooddisp
 
-emitpout:  sep     scall               ; and display ti
-           dw      disp
-           lbr     good                ; return to caller
 
 
 cwhile:    sep     scall               ; get top of stack
@@ -1945,9 +1946,7 @@ whileno:   ghi     r2                  ; copy machine stack to RA
            ldn     ra                  ; get low byte
            plo     rb
            dec     rb                  ; point back to while command
-           sep     scall               ; put onto return stack
-           dw      rpush
-           lbr     good                ; then return
+	   lbr goodrpush
 
 crepeat:   sep     scall               ; get address on return stack
            dw      rpop
@@ -1967,9 +1966,9 @@ cif:       sep     scall               ; get top of stack
            dw      pop
            lbdf    error               ; jump if error
            glo     rb                  ; check for zero
-           lbnz    ifno                ; jump if not zero
+           lbnz    good                ; jump if not zero
            ghi     rb                  ; check hi byte too
-           lbnz    ifno                ; jump if not zero
+           lbnz    good                ; jump if not zero
            ghi     r2                  ; transfer machine stack to RA
            phi     ra
            glo     r2
@@ -2006,7 +2005,7 @@ ifnotelse: ldn     rb                  ; retrieve byte
            dec     r7                  ; decrement if count
            lbnz    ifcnt               ; jump if not zero
            lbr     ifsave              ; otherwise found
-ifno:      lbr     good                ; no action needed, just return
+
 
 celse:     ghi     r2                  ; transfer machine stack to ra
            phi     ra
@@ -2038,7 +2037,6 @@ elsenif:   ldn     rb                  ; retrieve byte
            str     ra
            lbr     good                ; now pointing at a then
 
-cthen:     lbr     good                ; then is nothing but a place holder
 
 cequal:    sep     scall               ; get value from stack
            dw      pop
@@ -2065,10 +2063,9 @@ cequal:    sep     scall               ; get value from stack
            plo     rb
            inc     rb
            lbr goodpush
-unequal2:  ldi     0                   ; set return result
-           phi     rb
-           plo     rb
-           lbr     goodpush
+unequal2:  ldi     0
+	   plo     rb
+           lbr     goodpushb
 
 
 cdepth:    sex     r2                  ; be sure x is pointing to stack
@@ -2092,8 +2089,7 @@ cdepth:    sex     r2                  ; be sure x is pointing to stack
            phi     rb                  ; store answer
            glo     rb                  ; propagate the shift
            shrc
-           plo     rb
-	   lbr goodpush
+	   lbr goodpushb0
 
  
 crot:      sep     scall               ; get C
@@ -2132,8 +2128,7 @@ crot:      sep     scall               ; get C
            ghi     rc                  ; get A
            phi     rb
            glo     rc
-           plo     rb
-	   lbr goodpush
+	   lbr goodpushb0
 
  
 cmrot:     sep     scall               ; get C
@@ -2166,14 +2161,14 @@ cmrot:     sep     scall               ; get C
            ghi     rc                  ; get A
            phi     rb
            glo     rc
+goodpushb8b:	
            plo     rb
            sep     scall               ; put onto stack
            dw      push
            ghi     r8                  ; get B
            phi     rb
            glo     r8
-           plo     rb
-	   lbr goodpush
+	   lbr goodpushb0
 
  
 cover:     sep     scall               ; get B
@@ -2195,14 +2190,7 @@ cover:     sep     scall               ; get B
            ghi     r7                  ; get B
            phi     rb
            glo     r7
-           plo     rb
-           sep     scall               ; put onto stack
-           dw      push
-           ghi     r8                  ; get A
-           phi     rb
-           glo     r8
-           plo     rb
-	  lbr goodpush
+	   lbr goodpushb8b
 
            
 cat:       sep     scall               ; get address from stack
@@ -2215,8 +2203,7 @@ cat:       sep     scall               ; get address from stack
            lda     r7                  ; get word at address
            phi     rb
            ldn     r7
-           plo     rb
-	   lbr goodpush
+	   lbr goodpushb0
 
            
 cexcl:     sep     scall               ; get address from stack
@@ -2243,11 +2230,10 @@ ccat:      sep     scall               ; get address from stack
            phi     r7
            glo     rb
            plo     r7
-           lda     r7                  ; get word at address
-           plo     rb
            ldi     0                   ; high byte is zero
            phi     rb
-	   lbr goodpush
+           lda     r7                  ; get word at address
+	   lbr goodpushb0
 
            
 ccexcl:    sep     scall               ; get address from stack
@@ -2352,9 +2338,9 @@ colonlp1:  lda     rb                  ; get byte
            dec     ra
            ghi     rb
            str     ra
+cthen:	
+csemi:	
            lbr     good                ; return
-
-csemi:     lbr     good
 
 
 csee:      ghi     r2                  ; transfer machine stack
@@ -2436,7 +2422,7 @@ seeveq:
 	str r2
 	glo rf
 	or
-	bz seevnoa            	; was equal, jump
+	lbz seevnoa            	; was equal, jump
 seevallot:	
 	;; ok we need to do the allot here
 	push rb
@@ -2477,10 +2463,10 @@ seesto:
 seevnamea:
 	inc	   r7		       ; point to name
 	ldn	   r7
-	bz seevdata
+	lbz seevdata
 	sep scall
 	dw disp
-	br seevnamea
+	lbr seevnamea
 seevdata:
 	ldi ' '
 	sep scall
@@ -2509,7 +2495,7 @@ seevdata:
 	ghi rf
 	lbnz seesto
 	pop r7
-	sep sret   		; final CRLF already in place
+execdn:	sep sret   		; final CRLF already in place
 	
 seevnoa:	
            lda     rb                  ; get value
@@ -2640,22 +2626,24 @@ cdotqtdn:  glo     r8                  ; put pointer back
            str     ra
            lbr     good                ; and return
 
-ckey:      sep     scall               ; go and get a key
-           dw      getkey
-           plo     rb                  ; put into rb
+ckey:
            ldi     0                   ; zero the high byte
            phi     rb
-	   lbr     goodpush
+	   sep     scall               ; go and get a key
+           dw      getkey
+	   lbr     goodpushb0
 
 	;; [GDJ]				
-ckeyq:     mov     r7, 0
+ckeyq:     
+	ldi 0
+	phi r7
+	plo r7
+	phi rb
+
            sep     scall               ; check for key pressed
            dw      inkey
            glo     r7
-           plo     rb                  ; put into rb
-           ldi     0                   ; zero the high byte
-           phi     rb
-	   lbr	   goodpush
+	   lbr	   goodpushb0
 
 callot:    ldi     high storage        ; get address of storage
            phi     r7
@@ -2757,8 +2745,27 @@ cdiv:      sep     scall               ; get first value from stack
            ghi     rc                  ; transfer answer
            phi     rb
            glo     rc
-           plo     rb
-	   lbr goodpush
+	   lbr goodpushb0
+
+	; [GDJ]
+; following org prevents short branch out of page for bn1..bn4
+; if any preceding code is added - may need change depending on
+; amount of any further additions above
+;           org 2e00h 
+
+cef:       ldi     0                   ; start with zero
+	   phi rb
+           bn1     cef1                ; jump if ef1 not on
+           ori     1                   ; signal ef1 is on
+cef1:      bn2     cef2                ; jump if ef2 ot on
+           ori     2                   ; signal ef2 is on
+cef2:      bn3     cef3                ; jump if ef3 not on
+           ori     4                   ; signal ef3 is on
+cef3:      bn4     cef4                ; jump if ef4 not on
+           ori     8
+cef4:                       
+	   lbr goodpushb0
+
 
 cforget:   ghi     r2                  ; transfer machine stack
            phi     ra
@@ -2868,26 +2875,6 @@ cerror:    sep     scall               ; get number fro stack
            glo     rb                  ; get returned value
            lbr     execret             ; return to caller
 
-; [GDJ]
-; following org prevents short branch out of page for bn1..bn4
-; if any preceding code is added - may need change depending on
-; amount of any further additions above
-;           org 2e00h 
-
-cef:       ldi     0                   ; start with zero
-           bn1     cef1                ; jump if ef1 not on
-           ori     1                   ; signal ef1 is on
-cef1:      bn2     cef2                ; jump if ef2 ot on
-           ori     2                   ; signal ef2 is on
-cef2:      bn3     cef3                ; jump if ef3 not on
-           ori     4                   ; signal ef3 is on
-cef3:      bn4     cef4                ; jump if ef4 not on
-           ori     8
-cef4:      plo     rb                  ; prepare to put on stack
-           ldi     0
-           phi     rb
-	   lbr goodpush
-	
 
 
 cout:      sep     scall               ; get value from stack
@@ -2898,96 +2885,83 @@ cout:      sep     scall               ; get value from stack
            sep     scall               ; get port value
            dw      pop
            lbdf    error               ; jump on error
-           glo     r8                  ; get vlue
-           stxd                        ; store into memory for out
-           irx                         ; point to value
+           glo     r8                  ; get value
+           str     r2                        ; store into memory for out (assume X=2)
            glo     rb                  ; get port
+	   ani     7	               ; value must be 1-7
+	   lbz     error
            smi     1                   ; try port 1
-           lbnz    cout2               ; jump if not
-           out     1                   ; prform out
-           dec     r2                  ; move pointer back
-           lbr     good                ; and return to caller
-cout2:     smi     1                   ; try port 1
-           lbnz    cout3               ; jump if not
-           out     2                   ; prform out
-           dec     r2                  ; move pointer back
-           lbr     good                ; and return to caller
-cout3:     smi     1                   ; try port 1
-           lbnz    cout4               ; jump if not
-           out     3                   ; prform out
-           dec     r2                  ; move pointer back
-           lbr     good                ; and return to caller
-cout4:     smi     1                   ; try port 1
-           lbnz    cout5               ; jump if not
-           out     4                   ; prform out
-           dec     r2                  ; move pointer back
-           lbr     good                ; and return to caller
-cout5:     smi     1                   ; try port 1
-           lbnz    cout6               ; jump if not
-           out     5                   ; prform out
-           dec     r2                  ; move pointer back
-           lbr     good                ; and return to caller
-cout6:     smi     1                   ; try port 1
-           lbnz    cout7               ; jump if not
-           out     6                   ; prform out
-           dec     r2                  ; move pointer back
-           lbr     good                ; and return to caller
-cout7:     smi     1                   ; try port 1
-           lbnz    cout8               ; jump if not
-           out     7                   ; prform out
-           dec     r2                  ; move pointer back
-cout8:     lbr     good                ; and return to caller
+	;;  using a jump table is much shorter than old code
+	;;  we take port (0-6) *2 and add outtable
+	;;  then we shift PC to RB which will do the work and shift back to P=3
+	shl  			; *2
+	adi low outtable
+	plo rf
+	ldi high outtable
+	adci 0
+	phi rf
+	sep rf
+	dec r2
+	lbr good
 
-cinp:      sep     scall               ; get port
+outtable:
+	out 1
+	sep r3
+	out 2
+	sep r3
+	out 3
+	sep r3
+	out 4
+	sep r3
+	out 5
+	sep r3
+	out 6
+	sep r3
+	out 7
+	sep r3
+
+
+cinp:	   sep     scall               ; get port
            dw      pop
            lbdf    error               ; jump on error
            glo     rb                  ; get port
+	   ani     7
+	   lbz     error
            smi     1                   ; check port 1
-           lbnz    cinp2               ; jump if not
-           inp     1                   ; read port
-           lbr     cinpd               ; complete
-cinp2:     smi     1                   ; check port 1
-           lbnz    cinp3               ; jump if not
-           inp     2                   ; read port
-           lbr     cinpd               ; complete
-cinp3:     smi     1                   ; check port 1
-           lbnz    cinp4               ; jump if not
-           inp     3                   ; read port
-           lbr     cinpd               ; complete
-cinp4:     smi     1                   ; check port 1
-           lbnz    cinp5               ; jump if not
-           inp     4                   ; read port
-           lbr     cinpd               ; complete
-cinp5:     smi     1                   ; check port 1
-           lbnz    cinp6               ; jump if not
-           inp     5                   ; read port
-           lbr     cinpd               ; complete
-cinp6:     smi     1                   ; check port 1
-           lbnz    cinp7               ; jump if not
-           inp     6                   ; read port
-           lbr     cinpd               ; complete
-cinp7:     smi     1                   ; check port 1
-           lbnz    error               ; jump if not
-           inp     7                   ; read port
-cinpd:     plo     rb                  ; prepare to put on stack
-           ldi     0
-           phi     rb
-	   lbr goodpush
+  	   shl
+	   adi low intable
+	   plo rf
+	   ldi high intable
+	   adci 0
+	   phi rf
+	   ldi 0
+	   phi rb
+	   sep rf
+	   lbr goodpushb0
+	   
+	
+intable:
+	inp 1
+	sep r3
+	inp 2
+	sep r3
+	inp 3
+	sep r3
+	inp 4
+	sep r3
+	inp 5
+	sep r3
+	inp 6
+	sep r3
+	inp 7
+	sep r3
 
 
 
-; cstk:      mov     rb,fstack           ; get stack address
-           ; sep     scall               ; push onto stack
-           ; dw      push
-           ; lbr     good
+
 
 ; [GDJ]
-cspat:     mov     rb,fstack           ; get stack address pointer
-           glo     rb
-           plo     r8
-           ghi     rb
-           phi     r8
-
+cspat:     mov     r8,fstack           ; get stack address pointer
            ; get stack address 
            lda     r8
            phi     rb
@@ -3006,9 +2980,7 @@ cspat:     mov     rb,fstack           ; get stack address pointer
            str     r2
            ghi     rb
            adc
-           phi     rb
-
-	   lbr goodpush
+	   lbr goodpushb
 
 
 ; -----------------------------------------------------------------
@@ -3046,20 +3018,24 @@ csetq:     sep     scall               ; get top of stack
            dw      pop
            lbdf    error               ; jump if error
            glo     rb                  ; get low of return value
-           lbz     setqno              ; jump if zero
-           seq
-           lbr     good
-setqno:    req
-           lbr     good                ; return to caller
+	;; while this does add a nop
+	;; it saves several bytes over jumping
+	   lsz
+	   seq
+	   nop
+	   lsnz
+  	   req
+	   nop
+           lbr good
 
 
 cdecimal:  mov     rd, basen
            ldi     10
-           str     rd
-           lbr     good
+	   br basesave
 
 chex:      mov     rd, basen
            ldi     16
+basesave:	
            str     rd
            lbr     good
 
@@ -3075,8 +3051,7 @@ crand:     sep     scall
            ghi     r8
            plo     rb
            ldi     0
-           phi     rb
-	   lbr goodpush
+	   lbr goodpushb
 
 
 ; VT100 ansi control
@@ -3239,12 +3214,8 @@ cbload:    push    rf
            push    rd
            push    rc
            
-           mov     rf, extblock        ; source address
-#ifdef MCHIP
-           mov     rd, 8300h           ; destination address
-#else
-           mov     rd, 0300h           ; destination address
-#endif
+        mov     rf, extblock        ; source address
+	mov rd,himem
            mov     rc, endextblock-extblock  ; block size
 
 bloadlp:   lda     rf
@@ -3272,11 +3243,7 @@ csave:     push    rf                  ; save consumed registers
            dw      xopenw
            mov     rf,freemem          ; need pointer to freemem
            lda     rf                  ; get high address of free memory
-#ifdef MCHIP
-           smi     083h                ; subtract base address
-#else
-           smi     3                   ; subtract base address
-#endif
+	   smi     high himem
            phi     rc                  ; store into count
            ldn     rf                  ; get low byte of free memory
            plo     rc                  ; store into count
@@ -3623,9 +3590,15 @@ ishex:     sep     scall               ; see if it is numeric
 
 
 
-           ; clear tos, himem & rstack blocks 
+	; clear tos, himem & rstack blocks
+	;; this assumes stuff is at 7C00-7EFF ?? 
 clrstacks: mov     r7, 300h            ; clear 768 bytes
+#if MCHIP
+	;;  assuming this is true [gnr]
+	mov rc,0FC00h
+#else	
            mov     rc, 7c00h
+#endif	
            
 clrmemlp:  ldi     0h
            str     rc
@@ -3826,6 +3799,7 @@ cmdtable:  db      'WHIL',('E'+80h)
            db      'RAN',('D'+80h)     ; [GDJ]
 	   db	   'EXE',('C'+80h) 
 	   db      'LIS',('T'+80h)
+	   db      'X',('.'+80h)
            db      0                   ; no more tokens
 
 cmdvecs:   dw      cwhile              ; 81h
@@ -3900,6 +3874,7 @@ cmdvecs:   dw      cwhile              ; 81h
            dw      crand               ; c6h [GDJ]
 	   dw      cexec               ; c7h [gnr]
 	   dw	   clist	       ; c8h [gnr]
+	   dw      cdotx
 
 
 ; this precompiled BASE variable is loaded at startup freemem
