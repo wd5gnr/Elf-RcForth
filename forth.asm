@@ -3210,6 +3210,7 @@ cexec0:	   lbr jump   		; transfer to user code. If it returns, it goes back to 
 ; Load contents of dictionary - any session defined words/values will be zapped
 ; -----------------------------------------------------------------------------
 
+#ifndef NO_BLOAD	
 cbload:    push    rf
            push    rd
            push    rc
@@ -3231,7 +3232,7 @@ bloadlp:   lda     rf
            pop     rd
            pop     rf
            lbr     mainlp              ; back to main loop
-
+#endif
 
 ; -----------------------------------------------------------------
 
@@ -3869,7 +3870,11 @@ cmdvecs:   dw      cwhile              ; 81h
            dw      clshift             ; c1h [GDJ]
            dw      crshift             ; c2h [GDJ]
            dw      cdelay              ; c3h [GDJ]
-           dw      cbload              ; c4h [GDJ]
+#ifndef NO_BLOAD	
+        dw      cbload              ; c4h [GDJ]
+#else
+	dw	cload
+#endif	
            dw      cgotoxy             ; c5h [GDJ]
            dw      crand               ; c6h [GDJ]
 	   dw      cexec               ; c7h [gnr]
@@ -3892,6 +3897,7 @@ basev:  db 003h, 018h,					   ; this must be basen+1 word
         db 000h, 000h, 000h, 000h, 000h, 000h, 000h, 000h  ; zero next word
 #endif
 	
+#ifndef NO_BLOAD	
 
 #ifdef STGROM
 extblock:
@@ -4057,7 +4063,8 @@ extblock:
             db  000h, 000h, 000h, 000h, 000h, 000h, 000h, 000h
 endextblock:
 #endif
-
+#endif
+	
 endrom:    equ     $
 
 #ifdef ELFOS

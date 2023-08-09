@@ -22,6 +22,10 @@ X. is like . but puts 0x or 0# in front depending on BASE
 
 Code size is reduced! (b2-9b = 23 pages)
 
+If you pass -DNO_BLOAD to the assembler, you get a smaller version with no bload. Bload is still a word
+but it resolves to the same as LOAD and, presumably, you'll XMODEM whatever extended words you want or
+paste them in. No need to consume ROM with the words if you are going to load your own anyway!
+
 
 Note on stack representation:
 -----------------------------
