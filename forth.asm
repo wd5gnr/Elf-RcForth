@@ -3357,9 +3357,8 @@ cload:     push    rf                  ; save consumed registers
            sep     scall               ; now read program data
            dw      xread
            
-           ; temp removal [GDJ]
-           ;sep     scall               ; close XMODEM channel
-           ;dw      xcloser
+           sep     scall               ; close XMODEM channel
+           dw      xcloser
            pop     re                  ; [GDJ]
            pop     rc                  ; recover consumed registers
            pop     rf
