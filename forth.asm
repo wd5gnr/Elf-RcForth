@@ -2374,6 +2374,7 @@ ccolon:    ghi     r2                  ; transfer machine stack
            lbnz    error               ; jump if not
            inc     rb                  ; move into string
 ; prescan for semicolon (88h) because if missing, bad things happen
+#if 0
            push    rb
 prescantk:
            ldn     rb
@@ -2386,7 +2387,15 @@ prescantk:
            lbr     error  ; no semicolon on line!
 prescanok: pop     rb
 
-colonlp1:  lda     rb                  ; get byte
+#endif
+
+colonlp1:  ;lda     rb                  ; get byte
+#if 1
+           ldn     rb
+           smi     T_EOS
+           lbz error                    ; I suppose you could mark this and allow multiline words
+           lda     rb
+#endif           
            smi     88h                 ; look for the ;
            lbnz    colonlp1            ; jump if terminator not found
            ; check this is really the end
