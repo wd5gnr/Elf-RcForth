@@ -17,6 +17,45 @@
 	
 	;; [gnr] Bug fixes, assembler fixes,and the Exec word
 
+        ; A few notes as I've gone through the code (GNR)
+        ; This isn't done like a conventional Forth
+        ; Everything is parsed on processing the input line
+        ; First, it checks for core words. If it finds one, it tokenizes it >0x80
+        ; Then it checks for a number and, if found marks it with FF
+        ; Anything else must be a string, so it gets marked with an FE and terminated with a zero.
+        ; 
+        ; The colon operator just grabs the name, makes an entry, and copies all this
+        ; so no user words are tokenized
+        ;
+        ; The upside is you don't have a forward ref problem of what to do with words you 
+        ; don't know yet
+        ;
+        ; The downside is you can't override the system words. If you did (e.g., search
+        ; user space first) you'd have a problem with words compiled before the override
+
+        ; example: 5 2 + 1+ parses out as:
+        ; <NUM> 0005 <NUM> 0002 <+> <STR>1+<0>
+        ; And
+        ; : example 5 2 + 1+ ;
+        ; Parses out as:
+        ; <len><colon>example<0><NUM>0005<NUM>0002<+><STR>1+<SEMICOLON><0>
+        ;
+        ; You can define a word more than once, but only the first one gets used
+        ; You can't define words over multiple lines (seems easy to fix)
+        ; 
+        ; Although the semicolon doesn't really do anything, omitting it in a definition will crash
+        ; and burn the system (should fix) since you just copy a bunch of stuff over (fixed)
+        ; 
+        ; VARIABLE can't have anything following it
+        ; e.g. VARIABLE X X 0 ! -- does not work (now throws an error)
+        ; Anything after a ; on a word def is ignored also  (now throws an error)
+        ; 
+        ; To catch all these we now define T_TOS 0xFD. The tokenizer marks the end of string with it
+        ; and most things ignore it. But colon and varible use it to make sure the string is
+        ; complete and doesn't have too much stuff in it, also. As an extra feature, we now 
+        ; zero out new variables (but not the allot part)s
+
+
 #ifdef MCHIP
 #define ANYROM
 #define    CODE    02000h
@@ -182,6 +221,7 @@ FEXEC:	   equ     FFORGET+1
 FLIST:	   equ     FEXEC+1
 FDOTX:	   equ     FLIST+1
 
+T_EOS:     equ     253  ; end of command line
 T_NUM:     equ     255
 T_ASCII:   equ     254
 
@@ -1185,7 +1225,10 @@ notokwht:  ldi     0                   ; need ascii terminator
            str     rf                  ; store into buffer
            inc     rf                  ; point to next position
            lbr     tokenlp             ; and keep looking
-tokendn:   ldi     0                   ; need to terminate command string
+tokendn:   ldi     T_EOS
+           str     rf
+           inc     rf
+           ldi     0                   ; need to terminate command string
            str     rf                  ; write to buffer
            sep    sret                 ; return to caller
 
@@ -1196,6 +1239,9 @@ tokendn:   ldi     0                   ; need to terminate command string
 ; ****************************************************
 exec:      ldn     rb                  ; get byte from codestream
            lbz     execdn              ; jump if at end of stream
+           smi     T_EOS
+           lbz     execdn
+           ldn     rb
            smi     T_NUM               ; check for numbers
            lbz     execnum             ; code is numeric
            ldn     rb                  ; recover byte
@@ -2265,7 +2311,14 @@ cvariable: ghi     r2                  ; transfer machine stack
            inc     rb                  ; move into string
 varlp1:    lda     rb                  ; get byte
            lbnz    varlp1              ; jump if terminator not found
+           ; next must be T_EOS
+           ldn     rb
+           smi     T_EOS
+           lbnz    error
+           ldi 0
+           str rb   ; zero T_EOS
            inc     rb                  ; allow space for var value
+           str rb   ; make sure variable is set to zero (extra feature!)
            inc     rb                  ; new value of freemem
            ldi     low freemem         ; get current free memory pointer
            plo     r9                  ; put into data segment
@@ -2307,9 +2360,27 @@ ccolon:    ghi     r2                  ; transfer machine stack
            smi     T_ASCII             ; it must be an ascii mark
            lbnz    error               ; jump if not
            inc     rb                  ; move into string
+; prescan for semicolon (88h) because if missing, bad things happen
+           push    rb
+prescantk:
+           ldn     rb
+           smi     88h
+           bz      prescanok
+           lda     rb
+           smi     T_EOS
+           bnz     prescantk
+           pop     rb
+           lbr     error  ; no semicolon on line!
+prescanok: pop     rb
+
 colonlp1:  lda     rb                  ; get byte
            smi     88h                 ; look for the ;
            lbnz    colonlp1            ; jump if terminator not found
+           ; check this is really the end
+           ldn rb
+           smi T_EOS
+           lbnz error
+
            ldi     0                   ; want a command terminator
            str     rb                  ; write it
            inc     rb                  ; new value for freemem
@@ -3642,10 +3713,10 @@ clist:	mov r7,storage
 clist0:
 	push r7
 	ldn r7
-	bnz clist1
+	lbnz clist1
 	inc r7
 	ldn r7
-	bnz clist1
+	lbnz clist1
 	pop r7
 	lbr good
 clist1:	

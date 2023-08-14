@@ -8,11 +8,17 @@ RcForth forth-doc.txt
 By Mike Riley
 
 Previous  update : 24 May 2022  Glenn Jolly
-Last update: 9 Aug 2023 Al Williams
+Last update: 13 Aug 2023 Al Williams
 
 What's new
 ----------
 Verson 0.3 
+
+If you forget to close a colon definition or if you put extra things
+after a colon definition or a variable you will get an error
+
+Simple variables get initialized to 0 automatically
+
 
 Numbers can always be written as 0#10 or 0xFF (decimal 10 and hex FF).
 
