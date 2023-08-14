@@ -8,11 +8,16 @@ RcForth forth-doc.txt
 By Mike Riley
 
 Previous  update : 24 May 2022  Glenn Jolly
-Last update: 13 Aug 2023 Al Williams
+Last update: 14 Aug 2023 Al Williams
 
 What's new
 ----------
 Verson 0.3 
+
+Bload now happens when you start Forth new automatically
+
+If you don't want the extra words, issue NEW. You can issue that anytime to wipe out everything to the core words + BASE
+
 
 If you forget to close a colon definition or if you put extra things
 after a colon definition or a variable you will get an error
@@ -139,7 +144,7 @@ HEX      ( -- )           - Set the numeric radix to 16
 DELAY    (n --)           - Blocking delay of n milliseconds
 SAVE     ( -- )           - Save dictionary to terminal via Xmodem
 LOAD     ( -- )           - Load dictionary to terminal via Xmodem
-BLOAD    ( -- )           - Load extensions as binary block included in src code (note: resets to decimal before loading and leaves you in decimal mode)
+BLOAD    ( -- )           - Load extensions as binary block included in src code (note: resets to decimal before loading and leaves you in decimal mode) This happens automatically. If you don't want these functions, use NEW (see below).
 GOTOXY   (x y -- )        - Position the cursor at x,y
 RAND     ( -- b)          - Returns random byte
 EXEC     ( a -- r )       - Do an SCRT call to machine language at address a; Value of RB on return pushed on stack
@@ -148,12 +153,12 @@ INP      ( p -- b )       - Input byte b from port p
 EF       ( -- v )         - Read value of EF pins
 SETQ     ( x -- )         - Set q to value x
 BYE      ( -- )           - Exit
-
+NEW      ( -- )           - Wipe dictionary, stack, and reset RNG (careful! no confirmation!)
 
 Extended Functions:
 -------------------
 The extended functions are implemented as pre-loaded Forth programs.  As such they
-can be viewed with the SEE command and removed with the FORGET command.
+can be viewed with the SEE command and removed with the FORGET command. 
 
 
 NIP      (b a -- a)                 - Drop 2nd item from stack

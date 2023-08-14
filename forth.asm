@@ -220,6 +220,7 @@ FFORGET:   equ     FSEE+1
 FEXEC:	   equ     FFORGET+1
 FLIST:	   equ     FEXEC+1
 FDOTX:	   equ     FLIST+1
+FNEW:      equ     FDOTX+1
 
 T_EOS:     equ     253  ; end of command line
 T_NUM:     equ     255
@@ -350,7 +351,19 @@ memdone:   ldi     low himem           ; memory pointer
            inc     rf
            str     rf
            inc     rf
+           sep   scall
+           dw xnew
+#ifndef NO_BLOAD
+           lbr     cbload             ; should only do this on first time
+#else           
+           lbr     mainlp
+#endif
 
+cnew:     sep scall
+          dw xnew
+          lbr   mainlp
+
+xnew:
            ; [GDJ] create and initialize BASE variable
            mov     r7, 26
            mov     rc, basev
@@ -361,6 +374,7 @@ nextbase:  lda     rc
            dec     r7
            glo     r7
            lbnz    nextbase
+           
 
 #ifdef STGROM
            call    clrstacks           ; [GDJ]
@@ -382,9 +396,8 @@ nextbase:  lda     rc
            glo     r7
            inc     rf
            str     rf
+           sep   sret
 
-
-           lbr     mainlp
 
 old: 	   ldi     high himem	; [gnr] fix up r9 since this might be entry point
 	   phi     r9
@@ -1021,7 +1034,7 @@ notoken_0:
 	ldn rb
 	inc rb
 	smi 'X'
-	bz hexnum
+	lbz hexnum
 	br decnum
 notokenbaseadj:	  dec rb   	; point back at 0
 notokenbase:	
@@ -3871,6 +3884,7 @@ cmdtable:  db      'WHIL',('E'+80h)
 	   db	   'EXE',('C'+80h) 
 	   db      'LIS',('T'+80h)
 	   db      'X',('.'+80h)
+           db      'NE',('W'+80h)
            db      0                   ; no more tokens
 
 cmdvecs:   dw      cwhile              ; 81h
@@ -3949,7 +3963,8 @@ cmdvecs:   dw      cwhile              ; 81h
            dw      crand               ; c6h [GDJ]
 	   dw      cexec               ; c7h [gnr]
 	   dw	   clist	       ; c8h [gnr]
-	   dw      cdotx
+	   dw      cdotx               ; c9h [gnr]
+           dw      cnew                ; cah [gnr]           
 
 
 ; this precompiled BASE variable is loaded at startup freemem
