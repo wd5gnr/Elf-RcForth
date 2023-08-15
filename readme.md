@@ -8,11 +8,19 @@ RcForth forth-doc.txt
 By Mike Riley
 
 Previous  update : 24 May 2022  Glenn Jolly
-Last update: 14 Aug 2023 Al Williams
+Last update: 15 Aug 2023 Al Williams
 
 What's new
 ----------
 Verson 0.3 
+
+You can add comments by entering a \ which ignores the entire rest of the line. This is useful for
+files you intend to load. Comments are not stored.
+
+New words: here and ->here
+
+Force load the high portion of freememory pointers which could have been the source of intermittent issues with larger programs
+
 
 Bload now happens when you start Forth new automatically
 
@@ -103,6 +111,8 @@ C@       (a -- v)               - Retrieve byte value from address
 C!       (v a -- )              - Store byte value at address
 ALLOT    (n -- )                - Increase the last defined vars storage space
 CMOVE    (caddr1 caddr2 u -- )  - Move u bytes from caddr1 to caddr2
+HERE     ( -- a)                - Retreive the current free memory pointer
+->HERE   (a -- )                - Set the current free memory pointer (dangerous!)
 
 
 Function definition:

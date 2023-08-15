@@ -223,6 +223,8 @@ FEXEC:	   equ     FFORGET+1
 FLIST:	   equ     FEXEC+1
 FDOTX:	   equ     FLIST+1
 FNEW:      equ     FDOTX+1
+FHERE:     equ     FNEW+1
+HTOHERE:   equ     FHERE+1
 
 T_EOS:     equ     253  ; end of command line
 T_NUM:     equ     255
@@ -285,8 +287,8 @@ start:     ldi     high himem          ; get page of data segment
            mov     rb,rf
 #endif
 
-           ldi     low freemem         ; free memory pointer
-           plo     r9                  ; place into data pointer
+           sep     scall
+           dw      freememr9
            ldi     storage.1
            str     r9
            inc     r9
@@ -468,8 +470,8 @@ mainlp:    ldi     high prompt         ; address of prompt
            sep     scall               ; call tokenizer
            dw      tknizer
 
-           ldi     low freemem         ; get free memory pointer
-           plo     r9                  ; place into data segment
+           sep     scall
+           dw      freememr9
            lda     r9                  ; get free memory pointer
            phi     rb                  ; place into rF
            ldn     r9
@@ -908,8 +910,8 @@ tknizer:   ldi     high buffer         ; point to input buffer
            phi     rb
            ldi     low buffer
            plo     rb
-           ldi     low freemem         ; get free memory pointer
-           plo     r9                  ; place into data segment
+           sep     scall
+           dw      freememr9
            lda     r9                  ; get free memory pointer
            phi     rf                  ; place into rF
            ldn     r9
@@ -931,7 +933,20 @@ tokenlp:   ldn     rb                  ; get byte from buffer
 ; ********************************************
 ; *** Prepare to check against token table ***
 ; ********************************************
-nonwhite:  ldi     high cmdTable       ; point to comand table
+nonwhite:  
+           ldn rb
+           smi  '\'   ; possible comment
+           bnz noncom
+           inc rb
+           ldn rb
+           dec rb
+           smi (' '+1)
+           lbdf nonwhite  ; nope, not a comment, just something that starts with \
+           ldi 0
+           str rb
+           lbr tokendn    ; zero it and ignore all else
+noncom:           
+           ldi     high cmdTable       ; point to comand table
            phi     r7                  ; r7 will be command table pointer
            ldi     low cmdTable
            plo     r7
@@ -1570,8 +1585,8 @@ ci:        sep     scall               ; get value from return stack
 	   lbr  goodpush
 
 cmem:      sex     r2                  ; be sure x is pointing to stack
-           ldi     low freemem         ; point to free memory pointer
-           plo     r9                  ; place into data frame
+           sep     scall
+           dw      freememr9
            lda     r9                  ; get high byte of free memory pointer
            stxd                        ; store on stack
            lda     r9                  ; get low byte
@@ -2335,8 +2350,8 @@ varlp1:    lda     rb                  ; get byte
            inc     rb                  ; allow space for var value
            str rb   ; make sure variable is set to zero (extra feature!)
            inc     rb                  ; new value of freemem
-           ldi     low freemem         ; get current free memory pointer
-           plo     r9                  ; put into data segment
+           sep     scall
+           dw      freememr9
            lda     r9                  ; get current pointer
            phi     r7                  ; place here
            ldn     r9                  ; get low byte
@@ -2408,8 +2423,8 @@ colonlp1:  ;lda     rb                  ; get byte
            ldi     0                   ; want a command terminator
            str     rb                  ; write it
            inc     rb                  ; new value for freemem
-           ldi     low freemem         ; get current free memory pointer
-           plo     r9                  ; put into data segment
+           sep     scall
+           dw      freememr9
            lda     r9                  ; get current pointer
            phi     r7                  ; place here
            ldn     r9                  ; get low byte
@@ -3815,6 +3830,35 @@ randbyte:   mov rd,rseed
             rtn
 
 
+freememr9:
+        ldi low freemem
+        plo r9
+        ldi high freemem
+        phi r9
+        rtn    
+
+chere:  sep scall
+        dw freememr9
+        lda r9
+        phi rb
+        ldn r9
+        plo rb
+        lbr goodpush
+
+ctohere: sep scall
+         dw pop
+         lbdf error
+         sep scall
+         dw freememr9
+         ghi rb
+         str r9
+         inc r9
+         glo rb
+         str r9 
+         lbr good
+
+
+
 
 
 hello:     db      'Rc/Forth 0.3'
@@ -3896,6 +3940,8 @@ cmdtable:  db      'WHIL',('E'+80h)
 	   db      'LIS',('T'+80h)
 	   db      'X',('.'+80h)
            db      'NE',('W'+80h)
+           db      'HER',('E'+80h)
+           db      '->HER',('E'+80h)
            db      0                   ; no more tokens
 
 cmdvecs:   dw      cwhile              ; 81h
@@ -3975,7 +4021,9 @@ cmdvecs:   dw      cwhile              ; 81h
 	   dw      cexec               ; c7h [gnr]
 	   dw	   clist	       ; c8h [gnr]
 	   dw      cdotx               ; c9h [gnr]
-           dw      cnew                ; cah [gnr]           
+           dw      cnew                ; cah [gnr]    
+           dw      chere
+           dw      ctohere       
 
 
 ; this precompiled BASE variable is loaded at startup freemem
