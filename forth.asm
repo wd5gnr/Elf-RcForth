@@ -23,9 +23,11 @@
         ; First, it checks for core words. If it finds one, it tokenizes it >0x80
         ; Then it checks for a number and, if found marks it with FF
         ; Anything else must be a string, so it gets marked with an FE and terminated with a zero.
+        ; The tokenized string is already in the free storage so a VARIABLE or : just bumps up
+        ; the pointer to the end of the string (or just past, for a variable)
         ; 
-        ; The colon operator just grabs the name, makes an entry, and copies all this
-        ; so no user words are tokenized
+        ; The colon operator just grabs the name, and copies everything else. So core words
+        ; are tokenized, but variables and user words are not.
         ;
         ; The upside is you don't have a forward ref problem of what to do with words you 
         ; don't know yet
