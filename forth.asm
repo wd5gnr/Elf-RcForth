@@ -125,7 +125,7 @@ buffer:    equ     0200h
 himem:     equ     300h
 rstack:    equ     302h
 tos:       equ     304h
-freemem:   equ     306h
+freemem:   equ     306h   ; if you add anything between here and storage, look at basev, too!
 fstack:    equ     308h
 jump:      equ     30ah
 storage:   equ     30dh
@@ -242,12 +242,13 @@ include    build.inc
 #ifdef     ANYROM
            lbr     new
 notnew:	
+           mov     r6, old
+newornot:           
            mov     r2,stack
-           mov     r6,old
+           sex r2
            lbr     f_initcall
-new:       mov     r2,stack
-           mov     r6,start
-           lbr     f_initcall
+new:       mov     r6,start
+           br      newornot
 #endif
 
 start:     ldi     high himem          ; get page of data segment
@@ -369,7 +370,8 @@ cnew:     sep scall
 
 xnew:
            ; [GDJ] create and initialize BASE variable
-           mov     r7, 26
+           ldi     endbasev - basev  ; assume <256
+           plo r7
            mov     rc, basev
            mov     rd, freemem
 nextbase:  lda     rc
@@ -543,7 +545,7 @@ getkey:
 ; *** Returns R[B] = value                        ***
 ; ***         DF=0 no error, DF=1 error           ***
 ; ***************************************************
-pop:       sex     r2                  ; be sure x points to stack
+pop:       ;sex     r2                  ; be sure x points to stack
            ldi     low fstack          ; get stack address
            plo     r9                  ; select in data segment
            lda     r9
@@ -609,7 +611,7 @@ push:      ldi     low fstack          ; get stack address
 ; *** Returns R[B] = value                         ***
 ; ***         D=0 no error, D=1 error              ***
 ; ****************************************************
-rpop:      sex     r2                  ; be sure x points to stack
+rpop:      ;sex     r2                  ; be sure x points to stack
            ldi     low rstack          ; get stack address
            plo     r9                  ; select in data segment
            lda     r9
@@ -668,7 +670,7 @@ findname:  ldi     high storage        ; get address of stored data
            phi     rb                  ; put into r6
            ldi     low storage
            plo     rb
-           sex     r2                  ; make sure X points to stack
+          ; sex     r2                  ; make sure X points to stack
 findlp:    ghi     rb                  ; copy address
            phi     r7
            glo     rb
@@ -722,7 +724,7 @@ mul16:     ldi     0                   ; zero out total
            plo     r8
            phi     rc
            plo     rc
-           sex     r2                  ; make sure X points to stack
+          ; sex     r2                  ; make sure X points to stack
 mulloop:   glo     r7                  ; get low of multiplier
            lbnz    mulcont             ; continue multiplying if nonzero
            ghi     r7                  ; check hi byte as well
@@ -918,7 +920,7 @@ tknizer:   ldi     high buffer         ; point to input buffer
            plo     rf
            inc     rf
            inc     rf
-           sex     r2                  ; make sure x is pointing to stack
+         ;  sex     r2                  ; make sure x is pointing to stack
 
 ; ******************************
 ; *** Now the tokenizer loop ***
@@ -1089,7 +1091,7 @@ notoken1:  ldn     rb                  ; get byte
 isnumber:  ldi     0                   ; number starts out as zero
            phi     r7                  ; use r7 to compile number
            plo     r7
-           sex     r2                  ; make sure x is pointing to stack
+        ;   sex     r2                  ; make sure x is pointing to stack
 numberlp:  ghi     r7                  ; copy number to temp
            phi     r8
            glo     r7
@@ -1285,7 +1287,7 @@ exec:      ldn     rb                  ; get byte from codestream
            ani     07fh                ; strip high bit
            smi     1                   ; reset to origin
            shl                         ; addresses are two bytes
-           sex     r2                  ; point X to stack
+         ;  sex     r2                  ; point X to stack
            str     r2                  ; write offset for addtion
            ldi     low cmdvecs
            add                         ; add offset
@@ -1304,7 +1306,7 @@ exec:      ldn     rb                  ; get byte from codestream
            ghi     rb
            stxd
            lbr     jump
-execret:   sex     r2                  ; be sure X poits to stack
+execret:   ;sex     r2                  ; be sure X poits to stack
            plo     r7                  ; save return code
            irx                         ; recover rb
            lda     r2
@@ -1362,7 +1364,7 @@ ascnoerr:  inc     r7                  ; point to type
            ldn     r7                  ; get type
            smi     87h                 ; check for function
            lbnz    ascerr              ; jump if not
-           sex     r2                  ; be sure X is pointing to stack
+           ;sex     r2                  ; be sure X is pointing to stack
            glo     r8                  ; save position
            stxd                        ; and store on stack
            ghi     r8
@@ -1415,7 +1417,7 @@ cplus:     sep     scall               ; get value from stack
            sep     scall               ; get next number
            dw      pop
            lbdf    error               ; jump if stack was empty
-           sex     r2                  ; be sure X points to stack
+           ;sex     r2                  ; be sure X points to stack
            glo     r7                  ; perform addition
            str     r2
            glo     rb
@@ -1441,7 +1443,7 @@ cminus:    sep     scall               ; get value from stack
            sep     scall               ; get next number
            dw      pop
            lbdf    error               ; jump if stack was empty
-           sex     r2                  ; be sure X points to stack
+           ;sex     r2                  ; be sure X points to stack
            glo     r7                  ; perform addition
            str     r2
            glo     rb
@@ -1489,7 +1491,7 @@ cand:      sep     scall               ; get value from stack
            sep     scall               ; get next number
            dw      pop
            lbdf    error               ; jump if stack was empty
-           sex     r2                  ; be sure X points to stack
+         ;  sex     r2                  ; be sure X points to stack
            glo     r7                  ; perform and
            str     r2
            glo     rb
@@ -1512,7 +1514,7 @@ cor:       sep     scall               ; get value from stack
            sep     scall               ; get next number
            dw      pop
            lbdf    error               ; jump if stack was empty
-           sex     r2                  ; be sure X points to stack
+          ; sex     r2                  ; be sure X points to stack
            glo     r7                  ; perform and
            str     r2
            glo     rb
@@ -1534,7 +1536,7 @@ cxor:      sep     scall               ; get value from stack
            sep     scall               ; get next number
            dw      pop
            lbdf    error               ; jump if stack was empty
-           sex     r2                  ; be sure X points to stack
+          ; sex     r2                  ; be sure X points to stack
            glo     r7                  ; perform and
            str     r2
            glo     rb
@@ -1584,7 +1586,7 @@ ci:        sep     scall               ; get value from return stack
            dw      rpush 
 	   lbr  goodpush
 
-cmem:      sex     r2                  ; be sure x is pointing to stack
+cmem:     ; sex     r2                  ; be sure x is pointing to stack
            sep     scall
            dw      freememr9
            lda     r9                  ; get high byte of free memory pointer
@@ -1657,7 +1659,7 @@ loopcnt:   ghi     rb                  ; move it
            plo     r7
            sep     scall               ; get termination
            dw      rpop
-           sex     r2                  ; make sure x is pointing to stack
+          ; sex     r2                  ; make sure x is pointing to stack
            glo     rb                  ; get lo of termination
            str     r2                  ; place into memory 
            glo     r7                  ; get count
@@ -1692,7 +1694,7 @@ cloopdn:   sep     scall               ; pop off start of loop address
            lbr     good                ; and return
 cploop:    sep     scall               ; get top or return stack
            dw      rpop
-           sex     r2                  ; make sure X points to stack
+         ; sex     r2                  ; make sure X points to stack
            ghi     rb                  ; put count into memory
            stxd
            glo     rb
@@ -1767,7 +1769,7 @@ cunequal:  sep     scall               ; get value from stack
            sep     scall               ; get next number
            dw      pop
            lbdf    error               ; jump if stack was empty
-           sex     r2                  ; be sure X points to stack
+         ;  sex     r2                  ; be sure X points to stack
            glo     r7                  ; perform and
            str     r2
            glo     rb
@@ -1800,7 +1802,7 @@ cless:     sep     scall               ; get value from stack
            sep     scall               ; get next number
            dw      pop
            lbdf    error               ; jump if stack was empty
-           sex     r2                  ; be sure X points to stack
+         ;  sex     r2                  ; be sure X points to stack
 
            ghi     rb                  ; move number 
            phi     r7
@@ -1849,7 +1851,7 @@ culess:    sep     scall               ; get value from stack
            sep     scall               ; get next number
            dw      pop
            lbdf    error               ; jump if stack was empty
-           sex     r2                  ; be sure X points to stack
+         ;  sex     r2                  ; be sure X points to stack
 
            ghi     rb                  ; move number 
            phi     r8
@@ -2124,7 +2126,7 @@ cequal:    sep     scall               ; get value from stack
            sep     scall               ; get next number
            dw      pop
            lbdf    error               ; jump if stack was empty
-           sex     r2                  ; be sure X points to stack
+         ;  sex     r2                  ; be sure X points to stack
            glo     r7                  ; perform and
            str     r2
            glo     rb
@@ -2144,7 +2146,7 @@ unequal2:  ldi     0
            lbr     goodpushb
 
 
-cdepth:    sex     r2                  ; be sure x is pointing to stack
+cdepth:   ; sex     r2                  ; be sure x is pointing to stack
            ldi     low fstack          ; point to free memory pointer
            plo     r9                  ; place into data frame
            lda     r9                  ; get high byte of free memory pointer
@@ -2390,29 +2392,12 @@ ccolon:    ghi     r2                  ; transfer machine stack
            smi     T_ASCII             ; it must be an ascii mark
            lbnz    error               ; jump if not
            inc     rb                  ; move into string
-; prescan for semicolon (88h) because if missing, bad things happen
-#if 0
-           push    rb
-prescantk:
-           ldn     rb
-           smi     88h
-           bz      prescanok
-           lda     rb
-           smi     T_EOS
-           bnz     prescantk
-           pop     rb
-           lbr     error  ; no semicolon on line!
-prescanok: pop     rb
-
-#endif
 
 colonlp1:  ;lda     rb                  ; get byte
-#if 1
            ldn     rb
            smi     T_EOS
            lbz error                    ; I suppose you could mark this and allow multiline words
            lda     rb
-#endif           
            smi     88h                 ; look for the ;
            lbnz    colonlp1            ; jump if terminator not found
            ; check this is really the end
@@ -2789,7 +2774,7 @@ callotyes: inc     r7                  ; point to type byte
            ghi     rb
            shlc
            phi     rb
-           sex     r2                  ; be sure X points to stack
+          ; sex     r2                  ; be sure X points to stack
            glo     rb                  ; add rb to r8
            str     r2
            glo     r8
@@ -2844,7 +2829,7 @@ cdiv:      sep     scall               ; get first value from stack
            sep     scall               ; get second number
            dw      pop
            lbdf    error               ; jump on error
-           sex     r2
+         ;  sex     r2
            ghi     r9
            stxd
            sep     scall               ; call multiply routine
@@ -2903,7 +2888,7 @@ cforget:   ghi     r2                  ; transfer machine stack
            ldn     r7
            plo     rb
            dec     r7
-           sex     r2                  ; be sure X is pointing to stack
+       ;    sex     r2                  ; be sure X is pointing to stack
            glo     r7                  ; find difference in pointers
            str     r2
            glo     rb
@@ -3080,7 +3065,7 @@ cspat:     mov     r8,fstack           ; get stack address pointer
 
            ; add 1 byte offset
            mov     r7, 1
-           sex     r2                  ; be sure X points to stack
+        ;   sex     r2                  ; be sure X points to stack
            glo     r7                  ; perform addition
            str     r2
            glo     rb
@@ -3141,7 +3126,7 @@ csetq:     sep     scall               ; get top of stack
 
 cdecimal:  mov     rd, basen
            ldi     10
-	   br basesave
+	   lbr basesave
 
 chex:      mov     rd, basen
            ldi     16
@@ -4029,17 +4014,23 @@ cmdvecs:   dw      cwhile              ; 81h
 ; this precompiled BASE variable is loaded at startup freemem
 ; important to zero next word else 'words' may interpret
 ; startup random data as valid (rarely) which will type garbage 
+basenxt2: equ basen+1
 #ifdef MCHIP
 basev:  db 083h, 018h,
         db 07ch, 0ffh, 0c0h, 029h, 040h, 083h, 018h, 086h, ; next word address + VARIABLE
         db 0feh, 042h, 041h, 053h, 045h, 000h, 000h, 00ah  ; T_NUM 'BASE' VALUE
         db 000h, 000h, 000h, 000h, 000h, 000h, 000h, 000h  ; zero next word
 #else
-basev:  db 003h, 018h,					   ; this must be basen+1 word
-        db 07ch, 0ffh, 0c0h, 029h, 040h, 003h, 018h, 086h, ; next word address + VARIABLE
-        db 0feh, 042h, 041h, 053h, 045h, 000h, 000h, 00ah, ; T_NUM 'BASE' VALUE
+basev:  db basenxt2.1, basenxt2.0   ; free mem pointer		   
+        db 07ch, 0ffh ; fstack
+        db 0c0h, 029h, 040h    ; jump (actual value unimportant here)
+        ; This is the variable we want to add BASE
+        db basenxt2.1, basenxt2.0, FVARIABLE, ; next word address + VARIABLE
+        db T_ASCII, 'B', 'A', 'S', 'E', 000h, 000h, 00ah, ; T_NUM 'BASE' VALUE
         db 000h, 000h, 000h, 000h, 000h, 000h, 000h, 000h  ; zero next word
 #endif
+
+endbasev: equ $
 	
 #ifndef NO_BLOAD	
 
