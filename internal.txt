@@ -1,0 +1,34 @@
+Random notes about internals
+
+The parser tokenizes the input buffer into the work memory. Strings, numbers, and core words are tokenized. Non-core words are just strings.
+A VARIABLE or : definition just "saves" the work memory.
+
+ example: 5 2 + 1+ parses out as:
+ <NUM> 0005 <NUM> 0002 <+> <STR>1+<0>
+ And
+ : example 5 2 + 1+ ;
+ Parses out as:
+  <len><colon>example<0><NUM>0005<NUM>0002<+><STR>1+<SEMICOLON><0>
+ 
+  You can define a word more than once, but only the first one gets used
+  You can't define words over multiple lines (seems easy to fix)
+
+
+===
+
+Adding a word
+
+There are three main tasks. 1) Add a token at the top of the file to the end. 2) At the bottom of the file add the name in upper case with the last
+letter having bit 7 set ( "EXAMPL" + ('E'+80h), and 3) Define the pointer to the function right below that (conventionally, cexample or whatever).
+
+Adding a variable
+I have fixed the variable allocation to be more obvious. But note that if you add variables you mess up the BLOAD data which has to be redone. See below.
+
+Adding precompiled BLOAD data.
+The easiest thing to do is set up a clean copy of your words and save them as ASCII. Then recompile with BLOAD turned off and run it (e.g., in emulator).
+Load the words. Go from the top of RAM (0300 usually) to the end of the words (find the free memory or eyeball it). Then dump that memory and use it to
+update the BLOAD data. Try:
+."    db " hex 7c0 300 do I c@ ." , " I 7 and 7 = if CR ."    db " then loop
+
+Note that the first bits are the RAM variables so any change to variables needs this to be redone
+        
