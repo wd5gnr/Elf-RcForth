@@ -2480,10 +2480,14 @@ seevallot:
 	;; ok we need to do the allot here
 	push rb
 	ghi rf
+#ifdef ALLOT_WORDS
 	shr
+#endif
 	phi rb
 	glo rf
+#ifdef ALLOT_WORDS        
 	shrc 
+#endif        
 	plo rb
 	sep scall
 	dw typenumind    	; type count
@@ -2501,14 +2505,11 @@ seevallot:
 seesto:	
 	push rb  		; save for addr disp	
 	lda rb
-	phi r7
-	lda rb
 	plo rb
-	ghi r7
-	phi rb
+        ldi 0
+        phi rb   ; byte only
 	sep scall
 	dw typenumind   	; print data
-	
 	pop rb
 	pop r7
 	push r7
@@ -2528,7 +2529,6 @@ seevdata:
 	plo rb
 	ghi rc
 	phi rb
-	inc rc
 	inc rc    		; increase count
 	sep scall
 	dw typenumind
@@ -2537,11 +2537,9 @@ seevdata:
 
 	sep scall		;print !
 	dw f_inmsg
-	db '+ !',10,13,0
-	inc rb			; point to next word
-	inc rb
-	dec rf			; two less bytes
-	dec rf
+	db '+ c!',10,13,0
+	inc rb			; point to next byte
+	dec rf			; one less byte
 	;;  stop when rf is zero (assumes rf was even)
 	glo rf
 	lbnz seesto
