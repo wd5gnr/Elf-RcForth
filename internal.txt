@@ -30,5 +30,8 @@ Load the words. Go from the top of RAM (0300 usually) to the end of the words (f
 update the BLOAD data. Try:
 ."    db "  0x7c0 0x300 do I c@ ." , " I 7 and 7 = if CR ."    db " then loop
 
+That will get you close (you will need to close up blanks and add leading zeros to some hex numbers)
+In addition, you need to manually turn BASE from 10 to 0a in the output!
+
 Note that the first bits are the RAM variables so any change to variables needs this to be redone
         

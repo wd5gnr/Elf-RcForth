@@ -212,7 +212,7 @@ FNEW:      equ     FDOTX+1
 FHERE:     equ     FNEW+1
 FTOHERE:   equ     FHERE+1
 FBASE:     equ     FTOHERE+1
-
+FENDIF     equ     FBASE+1
 
 T_EOS:     equ     253  ; end of command line
 T_NUM:     equ     255
@@ -228,17 +228,18 @@ include    build.inc
 #endif
 
 #ifdef     ANYROM
-           lbr     new
+           lbr     new                  ; ROM cold entry point
 notnew:	
-           mov     r6, old
+           mov     r6, old              ; ROM warm entry point
 newornot:           
            mov     r2,stack
            sex r2
            lbr     f_initcall
 new:       mov     r6,start
-           br      newornot
+           br      newornot             ; common code for warm or cold start
 #endif
 
+; Cold start comes here after initcall
 start:     ldi     high himem          ; get page of data segment
            phi     r9                  ; place into r9
 #ifdef ANYROM
@@ -276,37 +277,23 @@ start:     ldi     high himem          ; get page of data segment
            mov     rb,rf
 #endif
 
-           sep     scall
+           sep     scall                ; set R9 to free memory
            dw      freememr9
            ldi     storage.1
            str     r9
            inc     r9
            ldi     storage.0
            str     r9
-
-;memlp:     ldi     0                   ; get a zero
-;           str     rb                  ; write to memory
-;           ldn     rb                  ; recover retrieved byte
-;           bnz     memdone             ; jump if not same
-;           ldi     255                 ; another value
-;           str     rb                  ; write to memory
-;           ldn     rb                  ; retrieve it
-;           smi     255                 ; compare against written
-;           bnz     memdone             ; jump if not same
-;           ghi     rb
-;           adi     1                   ; point to next page
-;           phi     rb                  ; and put it back
-;           smi     7fh                 ; prevent from going over 7f00h
-;           bnz     memlp
-memdone:   ldi     low himem           ; memory pointer
-           plo     r9                  ; place into r9
-           ghi     rb                  ; get high of last memory
-           str     r9                  ; write to data
-           phi     r2                  ; and to machine stack
-           inc     r9                  ; point to low byte
-           glo     rb                  ; get low of himem
-           str     r9                  ; and store
-           plo     r2
+           
+           ldi low himem
+           plo r9
+           ghi rb
+           str r9
+           phi r2
+           inc r9
+           glo rb
+           str r9 
+           plo r2
            ldi     low rstack          ; get return stack address
            plo     r9                  ; select in data segment
            ghi     rb                  ; get hi memory
@@ -330,10 +317,28 @@ memdone:   ldi     low himem           ; memory pointer
            str     r9                  ; write to pointer
            inc     r9                  ; point to low byte
            glo     rb                  ; get low byte
-           str     r9                  ; and store
+           str     r9                  ; and store         
+           sep   scall
+           dw xnew
+#ifndef NO_BLOAD
+           lbr     cbload             ; should only do this on first time
+#else           
+           lbr     mainlp
+#endif
+
+cnew:     sep scall    ; user wants to start over. Do not BLOAD
+          dw xnew
+          lbr   mainlp
+
+xnew: 
+           sep    scall
+           dw     freememr9    
            ldi     high storage        ; point to storage
+           str     r9
+           inc     r9 
            phi     rf
            ldi     low storage
+           str     r9 
            plo     rf
            ldi     0
            str     rf                  ; write zeroes as storage terminator
@@ -343,21 +348,8 @@ memdone:   ldi     low himem           ; memory pointer
            str     rf
            inc     rf
            str     rf
-           inc     rf
-           sep   scall
-           dw xnew
-#ifndef NO_BLOAD
-           lbr     cbload             ; should only do this on first time
-#else           
-           lbr     mainlp
-#endif
-
-cnew:     sep scall
-          dw xnew
-          lbr   mainlp
-
-xnew: 
-          mov rf, basev
+           inc     rf          
+          mov rf, basev       ; set base to 10
           ldi 0
           str rf
           inc rf
@@ -366,7 +358,7 @@ xnew:
 
 
 #ifdef STGROM
-           call    clrstacks           ; [GDJ]
+           call    clrstacks           ; [GDJ] clear stack
 #endif
 
            ; init 32 bit rng seed
@@ -387,7 +379,7 @@ xnew:
            str     rf
            sep   sret
 
-
+; OLD entry point for warm start (after init)
 old: 	   ldi     high himem	; [gnr] fix up r9 since this might be entry point
 	   phi     r9
 	   ldi     low himem           ; memory pointer
@@ -486,42 +478,28 @@ crlfout:
 ; **************************************
 ; *** Display a character, char in D ***
 ; **************************************
-#if 0	
-disp:      sep     scall               ; call bios
-#ifdef ELFOS
-           dw      o_type
-#else
-           dw      f_type              ; function to type a charactr
-#endif
-           sep     sret                ; return to caller
-#else
+
+disp:   
 #ifdef ELFOS
 	lbr o_type
 #else
 	lbr f_type
 #endif	
-#endif	
+
 
 ; ********************************
 ; *** Read a key, returns in D ***
 ; ********************************
-#if 0	
-getkey:    sep     scall               ; call bios
-#ifdef ELFOS
-           dw      o_readkey
-#else
-           dw      f_read              ; function to read a key
-#endif
-           sep     sret                ; return to caller
-#else
 getkey:
 #ifdef ELFOS
 	lbr o_readkey
 #else
 	lbr f_read
 #endif	
-#endif	
 
+
+; There seems to be an assumption throughout that R9.1 is always the same
+; This implies the stack is never bigger than a page
 
 ; ***************************************************
 ; *** Function to retrieve value from forth stack ***
@@ -1178,10 +1156,10 @@ tohexlp:   ldn     rb                  ; get next byte
            lbdf    nonnumber           ; jump if not hex character
            lbr     tohex
 tohexd:    ldn     rb                  ; recover character 0..9
-           smi     030h                ; convert to binary       
+           smi     '0'                ; convert to binary       
            lbr     tohexad
 tohex:     ldn     rb                  ; recover character A..F
-           smi     55                  ; convert to binary
+           smi     55                  ; convert to binary ('A'-10)
 tohexad:   str     r2                  ; store value to add
            ldi     4                   ; need to shift 4 times
            plo     re
@@ -1342,10 +1320,10 @@ ascerr:    ldi     high msgerr         ; get error message
 ascnoerr:  inc     r7                  ; point to type
            inc     r7
            ldn     r7                  ; get type
-           smi     86h                 ; check for variable
+           smi     FVARIABLE                 ; check for variable
            lbz     execvar             ; jump if so
            ldn     r7                  ; get type
-           smi     87h                 ; check for function
+           smi     FCOLON                 ; check for function
            lbnz    ascerr              ; jump if not
            ;sex     r2                  ; be sure X is pointing to stack
            glo     r8                  ; save position
@@ -1879,7 +1857,7 @@ cwordsf:   glo     rb                  ; get byte
            dw      disp
            inc     rd
            glo     rd
-           smi     12
+           smi     12                  ; items per line
            lbnz    cwordslp
 	ldi 0
 	phi rd
@@ -1903,9 +1881,7 @@ cwordslp2: lda     r7                  ; get pointer to next entry
            lbnz    cwordsnot           ; jump if not link terminator
            ghi     r8                  ; check high byte too
            lbnz    cwordsnot
-cwordsdn1: sep  scall
-	   dw   crlfout 
-           lbr     good                ; return to caller
+cwordsdn1: lbr ccr                     ; CR and done
 cwordsnot: inc     r7                  ; now pointing at ascii indicator
            inc     r7                  ; first character of name
 wordsnotl: lda     r7                  ; get byte from string
@@ -1978,13 +1954,13 @@ cwhile:    sep     scall               ; get top of stack
            ldi     0                   ; set while count to zero
            plo     r7
 findrep:   ldn     rb                  ; get byte from stream
-           smi     81h                 ; was a while found
+           smi     FWHILE                 ; was a while found
            lbnz    notwhile            ; jump if not
            inc     r7                  ; increment while count
 notrep:    inc     rb                  ; point to next byte
            lbr     findrep             ; and keep looking
 notwhile:  ldn     rb                  ; retrieve byte
-           smi     82h                 ; is it a repeat
+           smi     FREPEAT                 ; is it a repeat
            lbnz    notrep              ; jump if not
            glo     r7                  ; get while count
            lbz     fndrep              ; jump if not zero
@@ -2042,13 +2018,13 @@ cif:       sep     scall               ; get top of stack
            ldi     0                   ; set IF count
            plo     r7                  ; put into counter
 iflp1:     ldn     rb                  ; get next byte
-           smi     83h                 ; check for IF
+           smi     FIF                 ; check for IF
            lbnz    ifnotif             ; jump if not
            inc     r7                  ; increment if count
 ifcnt:     inc     rb                  ; point to next byte
            lbr     iflp1               ; keep looking
 ifnotif:   ldn     rb                  ; retrieve byte
-           smi     84h                 ; check for ELSE
+           smi     FELSE                 ; check for ELSE
            lbnz    ifnotelse           ; jump if not
            glo     r7                  ; get IF count
            lbnz    ifcnt               ; jump if it is not zero
@@ -2060,7 +2036,7 @@ ifsave:    glo     rb                  ; store back into instruction pointer
            str     ra
            lbr     good                ; and return
 ifnotelse: ldn     rb                  ; retrieve byte
-           smi     85h                 ; check for THEN
+           smi     FTHEN                ; check for THEN
            lbnz    ifcnt               ; jump if not
            glo     r7                  ; get if count
            dec     r7                  ; decrement if count
@@ -2080,13 +2056,13 @@ celse:     ghi     r2                  ; transfer machine stack to ra
            ldi     0                   ; count of IFs
            plo     r7                  ; put into R7
 elselp1:   ldn     rb                  ; get next byte from stream
-           smi     83h                 ; check for IF
+           smi     FIF                 ; check for IF
            lbnz    elsenif             ; jump if not if
            inc     r7                  ; increment IF count
 elsecnt:   inc     rb                  ; point to next byte
            lbr     elselp1             ; keep looking
 elsenif:   ldn     rb                  ; retrieve byte
-           smi     85h                 ; is it THEN
+           smi     FTHEN                ; is it THEN
            lbnz    elsecnt             ; jump if not
            glo     r7                  ; get IF count
            dec     r7                  ; minus 1 IF
@@ -2262,6 +2238,7 @@ cat:       sep     scall               ; get address from stack
            glo     rb
            plo     r7
            lda     r7                  ; get word at address
+catcomm:           
            phi     rb
            ldn     r7
 	   lbr goodpushb0
@@ -2292,9 +2269,7 @@ ccat:      sep     scall               ; get address from stack
            glo     rb
            plo     r7
            ldi     0                   ; high byte is zero
-           phi     rb
-           lda     r7                  ; get word at address
-	   lbr goodpushb0
+           lbr     catcomm
 
            
 ccexcl:    sep     scall               ; get address from stack
@@ -2381,7 +2356,7 @@ colonlp1:  ;lda     rb                  ; get byte
            smi     T_EOS
            lbz error                    ; I suppose you could mark this and allow multiline words
            lda     rb
-           smi     88h                 ; look for the ;
+           smi     FSEMI                 ; look for the ;
            lbnz    colonlp1            ; jump if terminator not found
            ; check this is really the end
            ldn rb
@@ -2751,12 +2726,14 @@ callotyes: inc     r7                  ; point to type byte
            sep     scall               ; get word from stack
            dw      pop
            lbdf    error               ; jump if error
+#ifdef ALLOT_WORDS           
            glo     rb                  ; multiply by 2
            shl
            plo     rb
            ghi     rb
            shlc
            phi     rb
+#endif           
           ; sex     r2                  ; be sure X points to stack
            glo     rb                  ; add rb to r8
            str     r2
@@ -3835,7 +3812,7 @@ ctohere: sep scall
 
 
 
-hello:     db      'Rc/Forth 0.3'
+hello:     db      'Rc/Forth 0.4'
 crlf:      db       10,13,0
 prompt:    db      'ok ',0
 msempty:   db      'stack empty',10,13,0
@@ -3917,6 +3894,7 @@ cmdtable:  db      'WHIL',('E'+80h)
            db      'HER',('E'+80h)
            db      '->HER',('E'+80h)
            db      'BAS',('E'+80h)
+           db      'ENDI',('F'+80h)
            db      0                   ; no more tokens
 
 cmdvecs:   dw      cwhile              ; 81h
@@ -4000,6 +3978,7 @@ cmdvecs:   dw      cwhile              ; 81h
            dw      chere
            dw      ctohere       
            dw      cbase
+           dw      cthen                ; alias ENDIF=then (as in gforth)
 
 
 	
@@ -4007,160 +3986,169 @@ cmdvecs:   dw      cwhile              ; 81h
 
 #ifdef STGROM
 extblock:
+ 
+	  db 7Eh,0FFh,7Dh,0EDh,7Ch,0FFh,07h,0FEh,                                   
+  db 7Ch,0FFh,0C0h,0A4h,0B9h,12h,0A6h,0DCh,                                   
+  db 40h,00h,0ah,03h,1Fh,87h,0FEh,4Eh,                                   
+  db 49h,50h,00h,8Bh,8Ah,88h,00h,03h,                                   
+  db 2Ch,87h,0FEh,54h,55h,43h,4Bh,00h,                                   
+  db 8Bh,0AAh,88h,00h,03h,42h,87h,0FEh,                                   
+  db 50h,49h,43h,4Bh,00h,0FFh,00h,02h,                                   
+  db 8Eh,0FFh,00h,02h,8Ch,0BEh,8Ch,0ABh,                                   
+  db 88h,00h,03h,4Fh,87h,0FEh,32h,44h,                                   
+  db 55h,50h,00h,0AAh,0AAh,88h,00h,03h,                                   
+  db 5Dh,87h,0FEh,32h,44h,52h,4Fh,50h,                                   
+  db 00h,8Ah,8Ah,88h,00h,03h,7Bh,87h,                                   
+  db 0FEh,32h,4Fh,56h,45h,52h,00h,0FFh,                                   
+  db 00h,03h,0FEh,50h,49h,43h,4Bh,00h,                                   
+  db 0FFh,00h,03h,0FEh,50h,49h,43h,4Bh,                                   
+  db 00h,88h,00h,03h,8Bh,87h,0FEh,32h,                                   
+  db 53h,57h,41h,50h,00h,0A2h,0A9h,0A1h,                                   
+  db 0A9h,88h,00h,03h,99h,87h,0FEh,54h,                                   
+  db 52h,55h,45h,00h,0FFh,00h,01h,88h,                                   
+  db 00h,03h,0A8h,87h,0FEh,46h,41h,4Ch,                                   
+  db 53h,45h,00h,0FFh,00h,00h,88h,00h,                                   
+  db 03h,0B1h,87h,0FEh,4Ah,00h,0A3h,88h,                                   
+  db 00h,03h,0BEh,87h,0FEh,31h,2Bh,00h,                                   
+  db 0FFh,00h,01h,8Ch,88h,00h,03h,0CBh,                                   
+  db 87h,0FEh,31h,2Dh,00h,0FFh,00h,01h,                                   
+  db 8Dh,88h,00h,03h,0D8h,87h,0FEh,32h,                                   
+  db 2Bh,00h,0FFh,00h,02h,8Ch,88h,00h,                                   
+  db 03h,0E5h,87h,0FEh,32h,2Dh,00h,0FFh,                                   
+  db 00h,02h,8Dh,88h,00h,03h,0F2h,87h,                                   
+  db 0FEh,30h,3Dh,00h,0FFh,00h,00h,9Bh,                                   
+  db 88h,00h,04h,00h,87h,0FEh,4Eh,4Fh,                                   
+  db 54h,00h,0FEh,30h,3Dh,00h,88h,00h,                                   
+  db 04h,0Bh,87h,0FEh,55h,3Eh,00h,8Bh,                                   
+  db 9Eh,88h,00h,04h,23h,87h,0FEh,55h,                                   
+  db 3Eh,3Dh,00h,0FEh,32h,44h,55h,50h,                                   
+  db 00h,0FEh,55h,3Eh,00h,0A2h,9Bh,0A1h,                                   
+  db 94h,88h,00h,04h,37h,87h,0FEh,55h,                                   
+  db 3Ch,3Dh,00h,0FEh,55h,3Eh,3Dh,00h,                                   
+  db 0FEh,4Eh,4Fh,54h,00h,88h,00h,04h,                                   
+  db 41h,87h,0FEh,3Eh,00h,8Bh,9Dh,88h,                                   
+  db 00h,04h,52h,87h,0FEh,3Ch,3Dh,00h,                                   
+  db 0FEh,3Eh,00h,0FEh,4Eh,4Fh,54h,00h,                                   
+  db 88h,00h,04h,61h,87h,0FEh,3Eh,3Dh,                                   
+  db 00h,9Dh,0FEh,4Eh,4Fh,54h,00h,88h,                                   
+  db 00h,04h,70h,87h,0FEh,30h,3Eh,00h,                                   
+  db 0FFh,00h,00h,0FEh,3Eh,00h,88h,00h,                                   
+  db 04h,7Dh,87h,0FEh,30h,3Ch,00h,0FFh,                                   
+  db 00h,00h,9Dh,88h,00h,04h,8Bh,87h,                                   
+  db 0FEh,46h,52h,45h,45h,00h,97h,91h,                                   
+  db 96h,88h,00h,04h,9Ah,87h,0FEh,2Bh,                                   
+  db 21h,00h,8Bh,0AAh,0ABh,8Ch,8Bh,0ACh,                                   
+  db 88h,00h,04h,0AAh,87h,0FEh,2Dh,21h,                                   
+  db 00h,8Bh,0AAh,0ABh,8Bh,8Dh,8Bh,0ACh,                                   
+  db 88h,00h,04h,0B9h,87h,0FEh,2Ah,21h,                                   
+  db 00h,8Bh,0AAh,0ABh,8Eh,8Bh,0ACh,88h,                                   
+  db 00h,04h,0C9h,87h,0FEh,2Fh,21h,00h,                                   
+  db 8Bh,0AAh,0ABh,8Bh,8Fh,8Bh,0ACh,88h,                                   
+  db 00h,04h,0D9h,87h,0FEh,43h,2Bh,21h,                                   
+  db 00h,89h,0A2h,0ADh,8Ch,0A1h,0AEh,88h,                                   
+  db 00h,04h,0EAh,87h,0FEh,43h,2Dh,21h,                                   
+  db 00h,89h,0A2h,0ADh,8Bh,8Dh,0A1h,0AEh,                                   
+  db 88h,00h,04h,0FBh,87h,0FEh,40h,2Bh,                                   
+  db 00h,89h,0ABh,8Bh,0FFh,00h,02h,8Ch,                                   
+  db 8Bh,88h,00h,05h,05h,87h,0FEh,3Fh,                                   
+  db 00h,0ABh,91h,88h,00h,05h,14h,87h,                                   
+  db 0FEh,4Eh,45h,47h,00h,0FFh,00h,00h,                                   
+  db 8Bh,8Dh,88h,00h,05h,2Bh,87h,0FEh,                                   
+  db 4Dh,49h,4Eh,00h,0FEh,32h,44h,55h,                                   
+  db 50h,00h,0FEh,3Eh,00h,83h,8Bh,85h,                                   
+  db 8Ah,88h,00h,05h,40h,87h,0FEh,4Dh,                                   
+  db 41h,58h,00h,0FEh,32h,44h,55h,50h,                                   
+  db 00h,9Dh,83h,8Bh,85h,8Ah,88h,00h,                                   
+  db 05h,59h,87h,0FEh,55h,4Dh,49h,4Eh,                                   
+  db 00h,0FEh,32h,44h,55h,50h,00h,0FEh,                                   
+  db 55h,3Eh,00h,83h,8Bh,85h,8Ah,88h,                                   
+  db 00h,05h,6Fh,87h,0FEh,55h,4Dh,41h,                                   
+  db 58h,00h,0FEh,32h,44h,55h,50h,00h,                                   
+  db 9Eh,83h,8Bh,85h,8Ah,88h,00h,05h,                                   
+  db 7Eh,87h,0FEh,3Fh,44h,55h,50h,00h,                                   
+  db 89h,83h,89h,85h,88h,00h,05h,94h,                                   
+  db 87h,0FEh,41h,42h,53h,00h,89h,0FEh,                                   
+  db 30h,3Ch,00h,83h,0FFh,00h,00h,8Bh,                                   
+  db 8Dh,85h,88h,00h,05h,0A0h,87h,0FEh,                                   
+  db 42h,4Ch,00h,0FFh,00h,20h,88h,00h,                                   
+  db 05h,0B0h,87h,0FEh,53h,50h,41h,43h,                                   
+  db 45h,00h,0FFh,00h,20h,0A5h,88h,00h,                                   
+  db 05h,0C6h,87h,0FEh,53h,50h,41h,43h,                                   
+  db 45h,53h,00h,0FFh,00h,00h,98h,0FFh,                                   
+  db 00h,20h,0A5h,99h,88h,00h,05h,0ECh,                                   
+  db 87h,0FEh,43h,4Ch,53h,00h,0FFh,00h,                                   
+  db 1Bh,0A5h,0FFh,00h,5Bh,0A5h,0FFh,00h,                                   
+  db 32h,0A5h,0FFh,00h,4Ah,0A5h,0FFh,00h,                                   
+  db 1Bh,0A5h,0FFh,00h,5Bh,0A5h,0FFh,00h,                                   
+  db 48h,0A5h,88h,00h,06h,08h,87h,0FEh,                                   
+  db 4Ch,53h,48h,49h,46h,54h,00h,89h,                                   
+  db 81h,8Bh,0FFh,00h,02h,8Eh,8Bh,0FFh,                                   
+  db 00h,01h,8Dh,89h,82h,8Ah,88h,00h,                                   
+  db 06h,24h,87h,0FEh,52h,53h,48h,49h,                                   
+  db 46h,54h,00h,89h,81h,8Bh,0FFh,00h,                                   
+  db 02h,8Fh,8Bh,0FFh,00h,01h,8Dh,89h,                                   
+  db 82h,8Ah,88h,00h,06h,35h,87h,0FEh,                                   
+  db 49h,4Eh,56h,45h,52h,54h,00h,0FFh,                                   
+  db 0FFh,0FFh,95h,88h,00h,06h,4Fh,87h,                                   
+  db 0FEh,53h,47h,4Eh,00h,89h,83h,0FFh,                                   
+  db 80h,00h,93h,83h,0FFh,0FFh,0FFh,84h,                                   
+  db 0FFh,00h,01h,85h,85h,88h,00h,06h,                                   
+  db 61h,87h,0FEh,4Dh,4Fh,44h,00h,89h,                                   
+  db 0A8h,89h,0A8h,8Fh,0A8h,8Eh,8Dh,88h,                                   
+  db 00h,06h,75h,87h,0FEh,2Fh,4Dh,4Fh,                                   
+  db 44h,00h,0AAh,0AAh,0FEh,4Dh,4Fh,44h,                                   
+  db 00h,0A9h,8Fh,88h,00h,06h,87h,87h,                                   
+  db 0FEh,47h,45h,54h,42h,49h,54h,00h,                                   
+  db 0C2h,0FFh,00h,01h,93h,88h,00h,06h,                                   
+  db 9Ah,87h,0FEh,53h,45h,54h,42h,49h,                                   
+  db 54h,00h,0FFh,00h,01h,8Bh,0C1h,94h,                                   
+  db 88h,00h,06h,0B1h,87h,0FEh,43h,4Ch,                                   
+  db 52h,42h,49h,54h,00h,0FFh,00h,01h,                                   
+  db 8Bh,0C1h,0FFh,0FFh,0FFh,95h,93h,88h,                                   
+  db 00h,06h,0C4h,87h,0FEh,54h,47h,4Ch,                                   
+  db 42h,49h,54h,00h,0FFh,00h,01h,8Bh,                                   
+  db 0C1h,95h,88h,00h,06h,0E2h,87h,0FEh,                                   
+  db 42h,59h,54h,45h,53h,57h,41h,50h,                                   
+  db 00h,89h,0FFh,00h,08h,0C2h,8Bh,0FFh,                                   
+  db 00h,0FFh,93h,0FFh,00h,08h,0C1h,94h,                                   
+  db 88h,00h,06h,0FCh,87h,0FEh,46h,49h,                                   
+  db 4Ch,4Ch,00h,8Bh,0A2h,0AAh,0AEh,89h,                                   
+  db 0FEh,31h,2Bh,00h,0A1h,0FEh,31h,2Dh,                                   
+  db 00h,0AFh,88h,00h,07h,11h,87h,0FEh,                                   
+  db 45h,52h,41h,53h,45h,00h,0FFh,00h,                                   
+  db 00h,0FEh,46h,49h,4Ch,4Ch,00h,88h,                                   
+  db 00h,07h,22h,87h,0FEh,43h,4Ch,45h,                                   
+  db 41h,52h,00h,0A7h,81h,8Ah,0A7h,82h,                                   
+  db 88h,00h,07h,5Bh,87h,0FEh,2Eh,53h,                                   
+  db 00h,0B0h,0FEh,3Ch,20h,22h,00h,0A7h,                                   
+  db 0FFh,00h,08h,0A5h,90h,0FFh,00h,08h,                                   
+  db 0A5h,0B0h,0FEh,3Eh,20h,22h,00h,0A7h,                                   
+  db 0FEh,3Fh,44h,55h,50h,00h,83h,89h,                                   
+  db 0FFh,00h,00h,98h,89h,92h,8Dh,0FEh,                                   
+  db 50h,49h,43h,4Bh,00h,90h,99h,8Ah,                                   
+  db 85h,88h,00h,07h,78h,87h,0FEh,54h,                                   
+  db 59h,50h,45h,00h,89h,83h,0FFh,00h,                                   
+  db 00h,98h,89h,0ADh,0A6h,0FFh,00h,01h,                                   
+  db 8Ch,99h,84h,8Ah,85h,8Ah,88h,00h,                                   
+  db 07h,0C3h,87h,0FEh,44h,55h,4Dh,50h,                                   
+  db 00h,96h,0FFh,00h,05h,0FEh,53h,50h,                                   
+  db 41h,43h,45h,53h,00h,0FFh,00h,10h,                                   
+  db 0FFh,00h,00h,98h,92h,90h,99h,0FFh,                                   
+  db 00h,00h,98h,96h,89h,90h,0FFh,00h,                                   
+  db 10h,0FFh,00h,00h,98h,89h,0ADh,90h,                                   
+  db 0FEh,31h,2Bh,00h,99h,89h,0FFh,00h,                                   
+  db 10h,8Dh,0FFh,00h,10h,0FEh,54h,59h,                                   
+  db 50h,45h,00h,0FFh,00h,10h,9Ah,8Ah,                                   
+  db 96h,88h,00h,07h,0D3h,87h,0FEh,43h,                                   
+  db 45h,4Ch,4Ch,53h,00h,0FFh,00h,02h,                                   
+  db 8Eh,88h,00h,07h,0E8h,87h,0FEh,2Ch,                                   
+  db 00h,0FFh,00h,02h,0B3h,8Bh,89h,0A8h,                                   
+  db 8Bh,0ACh,0FFh,00h,02h,8Ch,88h,00h,                                   
+  db 07h,0FEh,87h,0FEh,43h,2Ch,00h,0FFh,                                   
+  db 00h,01h,0B3h,8Bh,89h,0A8h,8Bh,0AEh,                                   
+  db 0FFh,00h,01h,8Ch,88h,00h,00h,00h
 
-	db 7Eh,0FFh,7Dh,0F3h,7Ch,0FFh,07h,0C3h,                        
-	db 7Ch,0FFh,0C0h,0A4h,0B8h,12h,0A6h,0DCh,                        
-	db 40h,00h,0Ah,03h,1Fh,87h,0FEh,4Eh,                        
-	db 49h,50h,00h,8Bh,8Ah,88h,00h,03h,                        
-	db 2Ch,87h,0FEh,54h,55h,43h,4Bh,00h,                        
-	db 8Bh,0AAh,88h,00h,03h,42h,87h,0FEh,                        
-	db 50h,49h,43h,4Bh,00h,0FFh,00h,02h,                        
-	db 8Eh,0FFh,00h,02h,8Ch,0BEh,8Ch,0ABh,                        
-	db 88h,00h,03h,4Fh,87h,0FEh,32h,44h,                        
-	db 55h,50h,00h,0AAh,0AAh,88h,00h,03h,                        
-	db 5Dh,87h,0FEh,32h,44h,52h,4Fh,50h,                        
-	db 00h,8Ah,8Ah,88h,00h,03h,7Bh,87h,                        
-	db 0FEh,32h,4Fh,56h,45h,52h,00h,0FFh,                        
-	db 00h,03h,0FEh,50h,49h,43h,4Bh,00h,                        
-	db 0FFh,00h,03h,0FEh,50h,49h,43h,4Bh,                        
-	db 00h,88h,00h,03h,8Bh,87h,0FEh,32h,                        
-	db 53h,57h,41h,50h,00h,0A2h,0A9h,0A1h,                        
-	db 0A9h,88h,00h,03h,99h,87h,0FEh,54h,                        
-	db 52h,55h,45h,00h,0FFh,00h,01h,88h,                        
-	db 00h,03h,0A8h,87h,0FEh,46h,41h,4Ch,                        
-	db 53h,45h,00h,0FFh,00h,00h,88h,00h,                        
-	db 03h,0B1h,87h,0FEh,4Ah,00h,0A3h,88h,                        
-	db 00h,03h,0BEh,87h,0FEh,31h,2Bh,00h,                        
-	db 0FFh,00h,01h,8Ch,88h,00h,03h,0CBh,                        
-	db 87h,0FEh,31h,2Dh,00h,0FFh,00h,01h,                        
-	db 8Dh,88h,00h,03h,0D8h,87h,0FEh,32h,                        
-	db 2Bh,00h,0FFh,00h,02h,8Ch,88h,00h,                        
-	db 03h,0E5h,87h,0FEh,32h,2Dh,00h,0FFh,                        
-	db 00h,02h,8Dh,88h,00h,03h,0F2h,87h,                        
-	db 0FEh,30h,3Dh,00h,0FFh,00h,00h,9Bh,                        
-	db 88h,00h,04h,00h,87h,0FEh,4Eh,4Fh,                        
-	db 54h,00h,0FEh,30h,3Dh,00h,88h,00h,                        
-	db 04h,0Bh,87h,0FEh,55h,3Eh,00h,8Bh,                        
-	db 9Eh,88h,00h,04h,23h,87h,0FEh,55h,                        
-	db 3Eh,3Dh,00h,0FEh,32h,44h,55h,50h,                        
-	db 00h,0FEh,55h,3Eh,00h,0A2h,9Bh,0A1h,                        
-	db 94h,88h,00h,04h,37h,87h,0FEh,55h,                        
-	db 3Ch,3Dh,00h,0FEh,55h,3Eh,3Dh,00h,                        
-	db 0FEh,4Eh,4Fh,54h,00h,88h,00h,04h,                        
-	db 41h,87h,0FEh,3Eh,00h,8Bh,9Dh,88h,                        
-	db 00h,04h,52h,87h,0FEh,3Ch,3Dh,00h,                        
-	db 0FEh,3Eh,00h,0FEh,4Eh,4Fh,54h,00h,                        
-	db 88h,00h,04h,61h,87h,0FEh,3Eh,3Dh,                        
-	db 00h,9Dh,0FEh,4Eh,4Fh,54h,00h,88h,                        
-	db 00h,04h,70h,87h,0FEh,30h,3Eh,00h,                        
-	db 0FFh,00h,00h,0FEh,3Eh,00h,88h,00h,                        
-	db 04h,7Dh,87h,0FEh,30h,3Ch,00h,0FFh,                        
-	db 00h,00h,9Dh,88h,00h,04h,8Bh,87h,                        
-	db 0FEh,46h,52h,45h,45h,00h,97h,91h,                        
-	db 96h,88h,00h,04h,9Ah,87h,0FEh,2Bh,                        
-	db 21h,00h,8Bh,0AAh,0ABh,8Ch,8Bh,0ACh,                        
-	db 88h,00h,04h,0AAh,87h,0FEh,2Dh,21h,                        
-	db 00h,8Bh,0AAh,0ABh,8Bh,8Dh,8Bh,0ACh,                        
-	db 88h,00h,04h,0B9h,87h,0FEh,2Ah,21h,                        
-	db 00h,8Bh,0AAh,0ABh,8Eh,8Bh,0ACh,88h,                        
-	db 00h,04h,0C9h,87h,0FEh,2Fh,21h,00h,                        
-	db 8Bh,0AAh,0ABh,8Bh,8Fh,8Bh,0ACh,88h,                        
-	db 00h,04h,0D9h,87h,0FEh,43h,2Bh,21h,                        
-	db 00h,89h,0A2h,0ADh,8Ch,0A1h,0AEh,88h,                        
-	db 00h,04h,0EAh,87h,0FEh,43h,2Dh,21h,                        
-	db 00h,89h,0A2h,0ADh,8Bh,8Dh,0A1h,0AEh,                        
-	db 88h,00h,04h,0FBh,87h,0FEh,40h,2Bh,                        
-	db 00h,89h,0ABh,8Bh,0FFh,00h,02h,8Ch,                        
-	db 8Bh,88h,00h,05h,05h,87h,0FEh,3Fh,                        
-	db 00h,0ABh,91h,88h,00h,05h,14h,87h,                        
-	db 0FEh,4Eh,45h,47h,00h,0FFh,00h,00h,                        
-	db 8Bh,8Dh,88h,00h,05h,2Bh,87h,0FEh,                        
-	db 4Dh,49h,4Eh,00h,0FEh,32h,44h,55h,                        
-	db 50h,00h,0FEh,3Eh,00h,83h,8Bh,85h,                        
-	db 8Ah,88h,00h,05h,40h,87h,0FEh,4Dh,                        
-	db 41h,58h,00h,0FEh,32h,44h,55h,50h,                        
-	db 00h,9Dh,83h,8Bh,85h,8Ah,88h,00h,                        
-	db 05h,59h,87h,0FEh,55h,4Dh,49h,4Eh,                        
-	db 00h,0FEh,32h,44h,55h,50h,00h,0FEh,                        
-	db 55h,3Eh,00h,83h,8Bh,85h,8Ah,88h,                        
-	db 00h,05h,6Fh,87h,0FEh,55h,4Dh,41h,                        
-	db 58h,00h,0FEh,32h,44h,55h,50h,00h,                        
-	db 9Eh,83h,8Bh,85h,8Ah,88h,00h,05h,                        
-	db 7Eh,87h,0FEh,3Fh,44h,55h,50h,00h,                        
-	db 89h,83h,89h,85h,88h,00h,05h,94h,                        
-	db 87h,0FEh,41h,42h,53h,00h,89h,0FEh,                        
-	db 30h,3Ch,00h,83h,0FFh,00h,00h,8Bh,                        
-	db 8Dh,85h,88h,00h,05h,0A0h,87h,0FEh,                        
-	db 42h,4Ch,00h,0FFh,00h,20h,88h,00h,                        
-	db 05h,0B0h,87h,0FEh,53h,50h,41h,43h,                        
-	db 45h,00h,0FFh,00h,20h,0A5h,88h,00h,                        
-	db 05h,0C6h,87h,0FEh,53h,50h,41h,43h,                        
-	db 45h,53h,00h,0FFh,00h,00h,98h,0FFh,                        
-	db 00h,20h,0A5h,99h,88h,00h,05h,0ECh,                        
-	db 87h,0FEh,43h,4Ch,53h,00h,0FFh,00h,                        
-	db 1Bh,0A5h,0FFh,00h,5Bh,0A5h,0FFh,00h,                        
-	db 32h,0A5h,0FFh,00h,4Ah,0A5h,0FFh,00h,                        
-	db 1Bh,0A5h,0FFh,00h,5Bh,0A5h,0FFh,00h,                        
-	db 48h,0A5h,88h,00h,06h,08h,87h,0FEh,                        
-	db 4Ch,53h,48h,49h,46h,54h,00h,89h,                        
-	db 81h,8Bh,0FFh,00h,02h,8Eh,8Bh,0FFh,                        
-	db 00h,01h,8Dh,89h,82h,8Ah,88h,00h,                        
-	db 06h,24h,87h,0FEh,52h,53h,48h,49h,                        
-	db 46h,54h,00h,89h,81h,8Bh,0FFh,00h,                        
-	db 02h,8Fh,8Bh,0FFh,00h,01h,8Dh,89h,                        
-	db 82h,8Ah,88h,00h,06h,35h,87h,0FEh,                        
-	db 49h,4Eh,56h,45h,52h,54h,00h,0FFh,                        
-	db 0FFh,0FFh,95h,88h,00h,06h,4Fh,87h,                        
-	db 0FEh,53h,47h,4Eh,00h,89h,83h,0FFh,                        
-	db 80h,00h,93h,83h,0FFh,0FFh,0FFh,84h,                        
-	db 0FFh,00h,01h,85h,85h,88h,00h,06h,                        
-	db 61h,87h,0FEh,4Dh,4Fh,44h,00h,89h,                        
-	db 0A8h,89h,0A8h,8Fh,0A8h,8Eh,8Dh,88h,                        
-	db 00h,06h,75h,87h,0FEh,2Fh,4Dh,4Fh,                        
-	db 44h,00h,0AAh,0AAh,0FEh,4Dh,4Fh,44h,                        
-	db 00h,0A9h,8Fh,88h,00h,06h,87h,87h,                        
-	db 0FEh,47h,45h,54h,42h,49h,54h,00h,                        
-	db 0C2h,0FFh,00h,01h,93h,88h,00h,06h,                        
-	db 9Ah,87h,0FEh,53h,45h,54h,42h,49h,                        
-	db 54h,00h,0FFh,00h,01h,8Bh,0C1h,94h,                        
-	db 88h,00h,06h,0B1h,87h,0FEh,43h,4Ch,                        
-	db 52h,42h,49h,54h,00h,0FFh,00h,01h,                        
-	db 8Bh,0C1h,0FFh,0FFh,0FFh,95h,93h,88h,                        
-	db 00h,06h,0C4h,87h,0FEh,54h,47h,4Ch,                        
-	db 42h,49h,54h,00h,0FFh,00h,01h,8Bh,                        
-	db 0C1h,95h,88h,00h,06h,0E2h,87h,0FEh,                        
-	db 42h,59h,54h,45h,53h,57h,41h,50h,                        
-	db 00h,89h,0FFh,00h,08h,0C2h,8Bh,0FFh,                        
-	db 00h,0FFh,93h,0FFh,00h,08h,0C1h,94h,                        
-	db 88h,00h,06h,0FCh,87h,0FEh,46h,49h,                        
-	db 4Ch,4Ch,00h,8Bh,0A2h,0AAh,0AEh,89h,                        
-	db 0FEh,31h,2Bh,00h,0A1h,0FEh,31h,2Dh,                        
-	db 00h,0AFh,88h,00h,07h,11h,87h,0FEh,                        
-	db 45h,52h,41h,53h,45h,00h,0FFh,00h,                        
-	db 00h,0FEh,46h,49h,4Ch,4Ch,00h,88h,                        
-	db 00h,07h,22h,87h,0FEh,43h,4Ch,45h,                        
-	db 41h,52h,00h,0A7h,81h,8Ah,0A7h,82h,                        
-	db 88h,00h,07h,5Bh,87h,0FEh,2Eh,53h,                        
-	db 00h,0B0h,0FEh,3Ch,20h,22h,00h,0A7h,                        
-	db 0FFh,00h,08h,0A5h,90h,0FFh,00h,08h,                        
-	db 0A5h,0B0h,0FEh,3Eh,20h,22h,00h,0A7h,                        
-	db 0FEh,3Fh,44h,55h,50h,00h,83h,89h,                        
-	db 0FFh,00h,00h,98h,89h,92h,8Dh,0FEh,                        
-	db 50h,49h,43h,4Bh,00h,90h,99h,8Ah,                        
-	db 85h,88h,00h,07h,78h,87h,0FEh,54h,                        
-	db 59h,50h,45h,00h,89h,83h,0FFh,00h,                        
-	db 00h,98h,89h,0ADh,0A6h,0FFh,00h,01h,                        
-	db 8Ch,99h,84h,8Ah,85h,8Ah,88h,00h,                        
-	db 07h,0C3h,87h,0FEh,44h,55h,4Dh,50h,                        
-	db 00h,96h,0FFh,00h,05h,0FEh,53h,50h,                        
-	db 41h,43h,45h,53h,00h,0FFh,00h,10h,                        
-	db 0FFh,00h,00h,98h,92h,90h,99h,0FFh,                        
-	db 00h,00h,98h,96h,89h,90h,0FFh,00h,                        
-	db 10h,0FFh,00h,00h,98h,89h,0ADh,90h,                        
-	db 0FEh,31h,2Bh,00h,99h,89h,0FFh,00h,                        
-	db 10h,8Dh,0FFh,00h,10h,0FEh,54h,59h,                        
-	db 50h,45h,00h,0FFh,00h,10h,9Ah,8Ah,                        
-	db 96h,88h,00h,00h,00h
+
 endextblock:
 #endif
 #endif

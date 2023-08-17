@@ -1,7 +1,7 @@
 rc/forth by Mike Riley
 
 Initial Changes by Glen Jolly and Al Williams are in the 0.2 branch.
-The 0.3 is now in the main branch.
+The 0.4 is now in the main branch.
 
 ```
 RcForth forth-doc.txt
@@ -12,7 +12,13 @@ Last update: 15 Aug 2023 Al Williams
 
 What's new
 ----------
-Verson 0.3 
+Verson 0.4 
+
+IMPORTANT: ALLOT now deals with bytes not words! See the word CELLS
+
+Fixed new regression. 
+
+New words: ENDIF, CELLS, , (Comma), and C,
 
 You can add comments by entering a \ which ignores the entire rest of the line. This is useful for
 files you intend to load. Comments are not stored.
@@ -96,6 +102,7 @@ LOOP     ( -- )           - End of DO LOOP
 IF       (B -- )          - Beginnig of IF-ELSE-THEN structure
 ELSE     ( -- )           - ELSE portion of IF-ELSE-THEN
 THEN     ( -- )           - End of IF-ELSE-THEN
+ENDIF    ( -- )           - Same as THEN
 >R       (a -- )          - Move top of data stack to return stack
 R>       ( -- a)          - Move top of return stack to data stack
 R@       ( -- a)          - Copy top of return stack to data stack
@@ -109,7 +116,7 @@ SP@      (a -- )                - Get address of tos pointer
 !        (v a -- )              - Store value at address
 C@       (a -- v)               - Retrieve byte value from address
 C!       (v a -- )              - Store byte value at address
-ALLOT    (n -- )                - Increase the last defined vars storage space
+ALLOT    (n -- )                - Increase the last defined vars storage space (Note in bytes now; see CELLS in extended words)
 CMOVE    (caddr1 caddr2 u -- )  - Move u bytes from caddr1 to caddr2
 HERE     ( -- a)                - Retreive the current free memory pointer
 ->HERE   (a -- )                - Set the current free memory pointer (dangerous!)
@@ -232,6 +239,9 @@ CLEAR    ( -- )                     - Clears the stack of all entries
 .S       ( -- )                     - Display entire contents of stack
 TYPE     (addr n -- )               - Display n bytes at addr
 DUMP     (addr n -- )               - Display n bytes at addr as 16 byte records
+CELLS    ( n -- 2n )                - Converts array index into byte offset
+,        ( a d -- a+2 )             - Use after array definition; see notes
+c,       ( a b -- a+1 )             - Use after array definition; see notes
 
 Notes:
 ------
@@ -252,6 +262,30 @@ HEX and DECIMAL don't work until AFTER the line is parsed. So you can't say:
 : doit hex 0f 2 * ;
 
 Unless you were already in hex, of course. The hex command would only affect the NEXT line.
+
+To create an array, you can use the comma or c, operators. However, unlike
+normal Forth, you must do it on a second line. Suppose you want to create an 
+array with 1, 2, 3 in it:
+
+VARIABLE numbers
+number 1 , 2 , 3 ,
+
+Note that the last comma actually allocates one more location. You could use swap ! instead.
+
+The c, is similar but allocates an extra byte
+
+You can also use ALLOT but this is now in bytes not words. Use CELLS or just multiply by 2:
+
+VARIABLE thing
+25 CELLS ALLOT
+
+Of course, if you want bytes, don't use CELLS. This is a good way to initialize a 
+machine language program:
+
+: CSTORE SWAP c! ;
+VARIABLE PGM
+PGM 0x7A , 0x7B , 0xD5 CSTORE
+
 
 Forth Tutorial:
 ---------------
