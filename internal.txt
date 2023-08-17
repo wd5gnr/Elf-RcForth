@@ -28,7 +28,7 @@ Adding precompiled BLOAD data.
 The easiest thing to do is set up a clean copy of your words and save them as ASCII. Then recompile with BLOAD turned off and run it (e.g., in emulator).
 Load the words. Go from the top of RAM (0300 usually) to the end of the words (find the free memory or eyeball it). Then dump that memory and use it to
 update the BLOAD data. Try:
-."    db " hex 7c0 300 do I c@ ." , " I 7 and 7 = if CR ."    db " then loop
+."    db "  0x7c0 0x300 do I c@ ." , " I 7 and 7 = if CR ."    db " then loop
 
 Note that the first bits are the RAM variables so any change to variables needs this to be redone
         

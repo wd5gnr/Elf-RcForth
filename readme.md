@@ -149,8 +149,8 @@ KEY      ( -- v)          - Read a char from the keyboard and place on stack
 KEY?     ( -- ?)          - Non blocking keyboard read returns 1 if pressed else 0
 SETQ     (n -- )          - Set Q line hi/lo for n 1/0 
 BASE     ( -- addr)       - Address containing the current numeric radix
-DECIMAL  ( -- )           - Set the numeric radix to 10 
-HEX      ( -- )           - Set the numeric radix to 16 
+DECIMAL  ( -- )           - Set the numeric radix to 10 (takes effect next input line)
+HEX      ( -- )           - Set the numeric radix to 16 (takes effect next input line)
 DELAY    (n --)           - Blocking delay of n milliseconds
 SAVE     ( -- )           - Save dictionary to terminal via Xmodem
 LOAD     ( -- )           - Load dictionary to terminal via Xmodem
@@ -247,6 +247,11 @@ Does NOT do what you think it does. End the line after the foo.
 
 SEE emits all integers as unsigned with 0x or 0# prefixes to faciliate reloading correctly
 This means that -1 test ! see test will show 0#65535 not -1 but those are the same thing.
+
+HEX and DECIMAL don't work until AFTER the line is parsed. So you can't say:
+: doit hex 0f 2 * ;
+
+Unless you were already in hex, of course. The hex command would only affect the NEXT line.
 
 Forth Tutorial:
 ---------------
