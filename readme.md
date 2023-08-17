@@ -284,7 +284,7 @@ machine language program:
 
 : CSTORE SWAP c! ;
 VARIABLE PGM
-PGM 0x7A , 0x7B , 0xD5 CSTORE
+PGM 0x7A c, 0x7B c, 0xD5 CSTORE
 
 
 Forth Tutorial:
