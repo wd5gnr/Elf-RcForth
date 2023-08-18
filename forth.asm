@@ -2495,6 +2495,8 @@ seevallot:
 	;;   dump all words (rf has byte count which needs +2 for the original word)
 	inc rf
 	inc rf
+; we should check if the length is odd. If so, we do one C! at the start and the rest we do ! 
+; with full words to minimize the amount of data we spit out
 	pop rb 			; start address
 	ldi 0
 	phi rc
@@ -2502,9 +2504,22 @@ seevallot:
 seesto:	
 	push rb  		; save for addr disp	
 	lda rb
-	plo rb
-        ldi 0
-        phi rb   ; byte only
+	plo re
+; check for odd count
+        glo rf
+        ani 1
+        bz seeeven 
+        glo re
+        plo rb   ; move for
+        ldi 0   ; byte only
+        phi rb
+        br seeodd
+seeeven:        
+        lda rb
+        plo rb  
+        glo re
+        phi rb 
+seeodd:
 	sep scall
 	dw typenumind   	; print data
 	pop rb
@@ -2526,18 +2541,34 @@ seevdata:
 	plo rb
 	ghi rc
 	phi rb
-	inc rc    		; increase count
 	sep scall
 	dw typenumind
 	pop rb  		; print n  
-	
-
+        sep scall
+        dw f_inmsg
+        db '+ ',0
+        glo rf
+        ani 1
+        bz seeeven1
+        dec rf               ; now it is even
+        ldi 'c'
 	sep scall		;print !
-	dw f_inmsg
-	db '+ c!',10,13,0
-	inc rb			; point to next byte
-	dec rf			; one less byte
-	;;  stop when rf is zero (assumes rf was even)
+        dw disp
+	inc rc    		; increase count
+        inc rb
+        br seecont
+seeeven1:
+        inc rc
+        inc rc         
+        inc rb 
+        inc rb
+        dec rf
+        dec rf
+seecont:        
+        sep scall
+        dw f_inmsg
+        db '!',10,13,0
+	;;  stop when rf is zero (assumes rf was even or made even)
 	glo rf
 	lbnz seesto
 	ghi rf
@@ -3034,15 +3065,15 @@ cspat:     mov     r8,fstack           ; get stack address pointer
 ; -----------------------------------------------------------------
 ccmove:    sep     scall               ; get top of stack
            dw      pop
-           lbdf    error               ; jump if error
+ccmerr:          lbdf    error               ; jump if error
            mov     rc,rb               ; rc is count of bytes
            sep     scall               ; get top of stack
            dw      pop
-           lbdf    error               ; jump if error
+           bdf    ccmerr               ; jump if error
            mov     r8,rb               ; r8 is destination address
            sep     scall               ; get top of stack
            dw      pop
-           lbdf    error               ; jump if error
+           bdf    ccmerr               ; jump if error
            mov     r7,rb               ; r7 is source address
 
            ; transfer data
@@ -3061,7 +3092,7 @@ cmovestr:  lda     r7
 
 csetq:     sep     scall               ; get top of stack
            dw      pop
-           lbdf    error               ; jump if error
+           bdf    ccmerr               ; jump if error
            glo     rb                  ; get low of return value
            bz qoff
            seq
@@ -3100,11 +3131,11 @@ crand:     sep     scall
 ; printf("%c[%d;%dH",ESC,y,x);
 cgotoxy:   sep     scall               ; get top of stack
            dw      pop
-           lbdf    error               ; jump if error
+xyerr:     lbdf    error               ; jump if error
            mov     rd,rb               ; rd is Y coord (row)
            sep     scall               ; get top of stack
            dw      pop
-           lbdf    error               ; jump if error
+           bdf    xyerr               ; jump if error
            mov     r8,rb               ; r8 is X coord (col)
 
            ; send CSI sequence
@@ -3140,10 +3171,7 @@ cgotoxy:   sep     scall               ; get top of stack
            
            ; type ending char
            ldi     'H'
-           sep     scall               ; call type routine
-           dw      f_tty
-
-           lbr     good
+           lbr     gooddisp
 
 
 ; -----------------------------------------------------------------------------

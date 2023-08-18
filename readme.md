@@ -14,6 +14,8 @@ What's new
 ----------
 Verson 0.4 
 
+Improved byte output of SEE/LIST for variables
+
 Fixed long-standing bug with < and U< that affected ABS, and all comparison operators. NOTE: This may break your scripts and may break some of the examples (will fix)
 
 Size changes. Errata note about comparison operators
