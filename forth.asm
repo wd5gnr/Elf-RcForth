@@ -1791,11 +1791,10 @@ cless:     sep     scall               ; get value from stack
 gooddf:	
 	ldi 0
 	phi rb  		; no matter what
-	lsnf
+	lsdf
 	ldi 1			; now D=0 if DF=0 or 1 if DF=1
 	plo rb
 	lbr goodpush
-	
 
 
 

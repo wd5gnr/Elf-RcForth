@@ -14,6 +14,8 @@ What's new
 ----------
 Verson 0.4 
 
+Fixed long-standing bug with < and U< that affected ABS, and all comparison operators. NOTE: This may break your scripts and may break some of the examples (will fix)
+
 Size changes. Errata note about comparison operators
 
 IMPORTANT: ALLOT now deals with bytes not words! See the word CELLS
@@ -247,7 +249,7 @@ c,       ( a b -- a+1 )             - Use after array definition; see notes
 
 Notes:
 ------
-I have noticed that the documentation for all the comparison operators looks backwards and is backwards from gforth. 
+I noticed that the documentation for all the comparison operators looks backwards and is backwards from gforth. 
 What's more is that equality parts are messed up also. This WILL BE FIXED AT SOME POINT and WILL BREAK YOUR CODE when it is
 
 gForth:
@@ -262,6 +264,9 @@ ok 5 2 < .
 1
 ok 5 5 < .
 1
+
+This appears to be in the original Jolly implement of cless and culess (flipped DF). Fixed now (maybe) but will break code and
+probably breaks some of the examples (will be fixed).
 
 
 BLOAD resets the system to decimal before loading.
