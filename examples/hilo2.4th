@@ -7,5 +7,5 @@ VARIABLE TURN
 : LOW ." Sorry, too low. Try again." CR ; 
 : RIGHT ." You got it in " TURN @ . ." tries! Good job. Enter play to try again." CR ; 
 : PLAY CLS GAMEINIT GAMESO ; 
-: GUESS 0#1  TURN +! DUP SECRET @ = IF RIGHT ELSE SECRET @ > IF LOW ELSE HIGH THEN THEN ; 
+: GUESS 0#1  TURN +! DUP SECRET @ = IF RIGHT ELSE SECRET @ < IF LOW ELSE HIGH THEN THEN ; 
 : HIGH ." Oops, too high. Try again." CR ; 
