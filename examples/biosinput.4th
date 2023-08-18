@@ -18,4 +18,4 @@ VARIABLE MLINPUT
 VARIABLE IBUFFER                                                                
 0xFF ALLOT                                                                      
 : BFINPUT DUP 0xFF  AND MLINPUT 1+ C! 0x08  RSHIFT MLINPUT 0x05  + C! MLINPUT 0x09  + C! MLINPUT EXEC ;                                                         
-: IINPUT 0xFF  IBUFFER BFINPUT 0x0A  EMIT ;                                     
+: IINPUT 0xFF  IBUFFER BFINPUT CR ;
