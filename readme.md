@@ -14,6 +14,8 @@ What's new
 ----------
 Verson 0.4 
 
+Size changes. Errata note about comparison operators
+
 IMPORTANT: ALLOT now deals with bytes not words! See the word CELLS
 
 Fixed new regression. 
@@ -245,6 +247,23 @@ c,       ( a b -- a+1 )             - Use after array definition; see notes
 
 Notes:
 ------
+I have noticed that the documentation for all the comparison operators looks backwards and is backwards from gforth. 
+What's more is that equality parts are messed up also. This WILL BE FIXED AT SOME POINT and WILL BREAK YOUR CODE when it is
+
+gForth:
+
+ok 5 2 < . 
+0
+ok 5 5 < .
+0
+
+RcForth
+ok 5 2 < .
+1
+ok 5 5 < .
+1
+
+
 BLOAD resets the system to decimal before loading.
 
 DUMP really prefers hex mode for formatting
