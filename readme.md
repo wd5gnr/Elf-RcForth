@@ -8,19 +8,32 @@ RcForth forth-doc.txt
 By Mike Riley
 
 Previous  update : 24 May 2022  Glenn Jolly
-Last update: 15 Aug 2023 Al Williams
+Last update: 19 Aug 2023 Al Williams
 
 What's new
 ----------
 Verson 0.4 
 
+You can use multiple line colon definitions (see examples/hilomulti.4th). If you are defining a word, the prompt will be :ok instead of ok.
+Note the multiple lines are not stored. You wind up with the same definition either way.
+
+^C will abort your input line even in a multi-line definition. Good for when you forget to use a semicolon on a single-line entry.
+
+###
+
 Improved byte output of SEE/LIST for variables
 
+###
+
 Fixed long-standing bug with < and U< that affected ABS, and all comparison operators. NOTE: This may break your scripts and may break some of the examples (will fix)
+
+###
 
 Size changes. Errata note about comparison operators
 
 IMPORTANT: ALLOT now deals with bytes not words! See the word CELLS
+
+###
 
 Fixed new regression. 
 
@@ -31,8 +44,9 @@ files you intend to load. Comments are not stored.
 
 New words: here and ->here
 
-Force load the high portion of freememory pointers which could have been the source of intermittent issues with larger programs
+###
 
+Force load the high portion of freememory pointers which could have been the source of intermittent issues with larger programs (not true; reverted)
 
 Bload now happens when you start Forth new automatically
 
@@ -40,7 +54,9 @@ If you don't want the extra words, issue NEW. You can issue that anytime to wipe
 
 
 If you forget to close a colon definition or if you put extra things
-after a colon definition or a variable you will get an error
+after a colon definition or a variable you will get an error (note, now, you can enter multiline definitions)
+
+###
 
 Simple variables get initialized to 0 automatically
 
@@ -252,7 +268,8 @@ c,       ( a b -- a+1 )             - Use after array definition; see notes
 Notes:
 ------
 I noticed that the documentation for all the comparison operators looks backwards and is backwards from gforth. 
-What's more is that equality parts are messed up also. This WILL BE FIXED AT SOME POINT and WILL BREAK YOUR CODE when it is
+What's more is that equality parts are messed up also. This WILL WILL BREAK YOUR CODE from earlier versions. In the same vein. Jolly fixed UNTIL to work properly 
+and that also breaks old code.
 
 gForth:
 
@@ -269,7 +286,6 @@ ok 5 5 < .
 
 This appears to be in the original Jolly implement of cless and culess (flipped DF). Fixed now (maybe) but will break code and
 probably breaks some of the examples (will be fixed).
-
 
 BLOAD resets the system to decimal before loading.
 
@@ -311,6 +327,13 @@ machine language program:
 : CSTORE SWAP c! ;
 VARIABLE PGM
 PGM 0x7A c, 0x7B c, 0xD5 CSTORE
+
+Previous code that used word-sized ALLOT will break
+
+Comments and line breaks are not stored
+
+In see/list the extra space after numbers is an artifact of how they are printed. This maybe fixed in the future.
+
 
 
 Forth Tutorial:

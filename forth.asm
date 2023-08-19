@@ -276,9 +276,8 @@ start:     ldi     high himem          ; get page of data segment
            dw      f_freemem
            mov     rb,rf
 #endif
-
-           sep     scall                ; set R9 to free memory
-           dw      freememr9
+           ldi low freemem                ; set R9 to free memory
+           plo r9
            ldi     storage.1
            str     r9
            inc     r9
@@ -308,8 +307,8 @@ cnew:     sep scall    ; user wants to start over. Do not BLOAD
           lbr   mainlp
 
 xnew: 
-           sep    scall
-           dw     freememr9    
+           ldi low freemem                ; set R9 to free memory
+           plo r9
            ldi     high storage        ; point to storage
            str     r9
            inc     r9 
@@ -358,6 +357,10 @@ xnew:
 
 ; shared code between new and old 
 fresh:
+           ldi     low jump
+           plo     r9
+           ldi     0c0h
+           str     r9                  ; we use JUMP as a flag. C0 is normal
            ldi     low rstack          ; get return stack address
            plo     r9                  ; select in data segment
            ghi     rb                  ; get hi memory
@@ -405,6 +408,13 @@ mainlp:    ldi     high prompt         ; address of prompt
            phi     rf                  ; place into r6
            ldi     low prompt
            plo     rf
+           ldi     low jump
+           plo     r9
+           ldn     r9
+           xri     0c0h                ; normal operations
+           bz      mainprompt
+           dec rf                      ; select alternate prompt
+mainprompt:           
            sep     scall               ; display prompt
 #ifdef ELFOS
            dw      o_msg
@@ -421,7 +431,31 @@ mainlp:    ldi     high prompt         ; address of prompt
 #else
            dw      f_input             ; function to read a line
 #endif
-
+           lbnf     mainent        ; ^C 
+           sep     scall
+           dw      f_inmsg
+           db      '^C',10,13,0
+           ldi    low jump
+           plo   r9
+           ldn   r9
+           xri   0c0h   ; test if we are in the middle of a colon def
+           lbz    mainlp  ; nope!
+           ldi 0C0h   ; yes, turn it off and restore freemem
+           str r9
+           inc r9
+           lda r9
+           plo rf
+           ldn r9
+           phi rf
+           ldi low freemem
+           plo r9
+           ghi rf
+           str r9
+           inc r9
+           glo rf
+           str r9
+           lbr      mainlp
+mainent:           
 	   sep     scall
 	   dw      crlfout
            mov     rf,buffer           ; convert to uppercase
@@ -430,12 +464,17 @@ mainlp:    ldi     high prompt         ; address of prompt
            sep     scall               ; call tokenizer
            dw      tknizer
 
-           sep     scall
-           dw      freememr9
+           ldi low freemem                ; set R9 to free memory
+           plo r9
            lda     r9                  ; get free memory pointer
-           phi     rb                  ; place into rF
+           phi     rb                  ; place into rb
            ldn     r9
            plo     rb
+           ldi     low jump   ; check for mid colon definition
+           plo     r9
+           ldn     r9
+           xri     0c0h
+           lsnz            ; don't do next two increments
            inc     rb
            inc     rb
            sep     scall
@@ -482,7 +521,8 @@ getkey:
 
 
 ; There seems to be an assumption throughout that R9.1 is always the same
-; This implies the stack is never bigger than a page
+; This is because it is only used to access the variables like freemem and jump
+; so it is assumed they are always on the same page
 
 ; ***************************************************
 ; *** Function to retrieve value from forth stack ***
@@ -751,7 +791,8 @@ mdnorm3:   glo     re                  ; recover sign flag
 
 ; *** RC = RB/R7 
 ; *** RB = remainder
-; *** uses R8 and R9
+; *** uses R8 and R9 (which is bad since we assume R9.1 stays the same all the time!)
+; the caller saves R9 though (only called in cdiv)
 div16:     sep     scall               ; normalize numbers
            dw      mdnorm
            plo     re                  ; save sign comparison
@@ -856,12 +897,18 @@ tknizer:   ldi     high buffer         ; point to input buffer
            phi     rb
            ldi     low buffer
            plo     rb
-           sep     scall
-           dw      freememr9
+           ldi low freemem                ; set R9 to free memory
+           plo r9
            lda     r9                  ; get free memory pointer
            phi     rf                  ; place into rF
            ldn     r9
            plo     rf
+           ; if we are in the middle of a multiline colon, we do NOT add 2 here
+           ldi low jump
+           plo r9
+           ldn r9
+           xri 0c0h
+           bnz  tokenlp 
            inc     rf
            inc     rf
          ;  sex     r2                  ; make sure x is pointing to stack
@@ -882,7 +929,7 @@ tokenlp:   ldn     rb                  ; get byte from buffer
 nonwhite:  
            ldn rb
            smi  '\'   ; possible comment
-           bnz noncom
+           lbnz noncom
            inc rb
            ldn rb
            dec rb
@@ -1213,10 +1260,23 @@ tokendn:   ldi     T_EOS
 ; ****************************************************
 ; *** Execute forth byte codes, RB points to codes ***
 ; ****************************************************
-exec:      ldn     rb                  ; get byte from codestream
+exec:      
+           ldn     rb                  ; get byte from codestream
            lbz     execdn              ; jump if at end of stream
            smi     T_EOS
            lbz     execdn
+
+           ldi     low jump            ; see if we are in the middle of a colon definitino
+           plo     r9
+           ldn     r9
+           xri     0c0h
+           bz      execnorm
+           glo     rb                  ; save rb
+           stxd
+           ghi     rb
+           stxd
+           lbr     ccolon
+execnorm:
            ldn     rb
            smi     T_NUM               ; check for numbers
            lbz     execnum             ; code is numeric
@@ -1522,7 +1582,7 @@ cserr:     lbdf    error               ; jump if stack was empty
            plo     r7
            sep     scall               ; get next number
            dw      pop
-           bdf    cserr               ; jump if stack was empty
+           lbdf    error               ; jump if stack was empty
            ghi     rb                  ; move number 
            phi     r8
            glo     rb
@@ -1547,8 +1607,8 @@ ci:        sep     scall               ; get value from return stack
 	   lbr  goodpush
 
 cmem:     ; sex     r2                  ; be sure x is pointing to stack
-           sep     scall
-           dw      freememr9
+           ldi low freemem                ; set R9 to free memory
+           plo r9
            lda     r9                  ; get high byte of free memory pointer
            stxd                        ; store on stack
            lda     r9                  ; get low byte
@@ -2281,7 +2341,7 @@ ccexcl:    sep     scall               ; get address from stack
            sep     scall               ; date data word from stack
            dw      pop
            lbdf    error               ; jump on error
-           br goodexcl
+           lbr goodexcl
 
 cvariable: ghi     r2                  ; transfer machine stack
            phi     ra
@@ -2307,8 +2367,8 @@ varlp1:    lda     rb                  ; get byte
            inc     rb                  ; allow space for var value
            str rb   ; make sure variable is set to zero (extra feature!)
            inc     rb                  ; new value of freemem
-           sep     scall
-           dw      freememr9
+           ldi low freemem                ; set R9 to free memory
+           plo r9
            lda     r9                  ; get current pointer
            phi     r7                  ; place here
            ldn     r9                  ; get low byte
@@ -2333,6 +2393,8 @@ varlp1:    lda     rb                  ; get byte
            ghi     rb
            str     ra
            lbr     good                ; return
+
+
 
 ccolon:    ghi     r2                  ; transfer machine stack
            phi     ra
@@ -2343,6 +2405,11 @@ ccolon:    ghi     r2                  ; transfer machine stack
            phi     rb
            ldn     ra
            plo     rb
+           ldi     low jump   ; we use this as a flag for multiline ops
+           plo     r9
+           ldn     r9
+           xri     0c0h
+           bnz     colonlp1           ; multiline, just keep it going
            ldn     rb                  ; get next byte
            smi     T_ASCII             ; it must be an ascii mark
            lbnz    error               ; jump if not
@@ -2351,20 +2418,43 @@ ccolon:    ghi     r2                  ; transfer machine stack
 colonlp1:  ;lda     rb                  ; get byte
            ldn     rb
            smi     T_EOS
-           lbz error                    ; I suppose you could mark this and allow multiline words
+           lbz colonmark
            lda     rb
            smi     FSEMI                 ; look for the ;
            lbnz    colonlp1            ; jump if terminator not found
            ; check this is really the end
            ldn rb
            smi T_EOS
-           lbnz error
+           lbnz  error
 
            ldi     0                   ; want a command terminator
            str     rb                  ; write it
            inc     rb                  ; new value for freemem
-           sep     scall
-           dw      freememr9
+           ldi     low jump
+           plo     r9
+           ldn     r9
+           xri     0C0h
+           bz      colonpreline         ; single line
+; end of multiline
+           ldi     02
+           str     r9 
+           inc     r9
+           lda     r9
+           stxd
+           ldn     r9
+           str     r2
+           ldi low freemem
+           plo r9
+           lda     r2
+           str     r9
+           inc     r9
+           ldn     r2
+           str     r9
+           
+; now the freemem is back to the beginning of the multiline (or we jumped here on a single line)
+colonpreline:
+           ldi low freemem                ; set R9 to free memory
+           plo r9
            lda     r9                  ; get current pointer
            phi     r7                  ; place here
            ldn     r9                  ; get low byte
@@ -2374,23 +2464,64 @@ colonlp1:  ;lda     rb                  ; get byte
            inc     r7
            glo     rb
            str     r7
+ccolonpmult:  ; come here to only update freemem
            glo     rb                  ; store new freemem value
            str     r9
            dec     r9
            ghi     rb
            str     r9
-           ldi     0                   ; need zero at end of list
+           ldi     low jump
+           plo     r9
+           ldn     r9
+           xri     1
+           bz      colonnend
+           ldi     0                   ; need zero at end of list (only if finished)
            str     rb                  ; store it
            inc     rb
            str     rb
+colonnend:           
            glo     rb                  ; write back to instruction pointer
            str     ra
            dec     ra
            ghi     rb
            str     ra
+;           ldi     low jump    ; already loaded!
+;           plo     r9
+           ldn     r9
+           xri     2            ; end of multiline
+           bnz     csemi
+           ldi     0c0h
+           str     r9           ; mark back to normal
 cthen:	
 csemi:	
            lbr     good                ; return
+
+colonmark: 
+           ldi 0
+           str rb
+           inc rb
+           str rb   ; temporary end mark
+           dec rb
+           ldi low jump
+           plo r9
+           ldn r9
+           xri 0c0h
+           bnz colonmcont  ; already marked
+           ldi 1
+           str r9
+           inc r9
+           ldn ra   ; low part
+           smi 3    ; point back to very start
+           str r9
+           inc r9
+           dec ra
+           lda ra
+           smbi 0
+           str r9
+colonmcont:
+           ldi low freemem+1
+           plo r9    ; set up for main code
+           br ccolonpmult           
 
 
 csee:      ghi     r2                  ; transfer machine stack
@@ -2508,7 +2639,7 @@ seesto:
 ; check for odd count
         glo rf
         ani 1
-        bz seeeven 
+        lbz seeeven 
         glo re
         plo rb   ; move for
         ldi 0   ; byte only
@@ -2830,18 +2961,7 @@ cdiv:      sep     scall               ; get first value from stack
 
 
 
-cef:       ldi     0                   ; start with zero
-	   phi rb
-           bn1     cef1                ; jump if ef1 not on
-           ori     1                   ; signal ef1 is on
-cef1:      bn2     cef2                ; jump if ef2 ot on
-           ori     2                   ; signal ef2 is on
-cef2:      bn3     cef3                ; jump if ef3 not on
-           ori     4                   ; signal ef3 is on
-cef3:      bn4     cef4                ; jump if ef4 not on
-           ori     8
-cef4:                       
-	   lbr goodpushb0
+
 
 
 cforget:   ghi     r2                  ; transfer machine stack
@@ -2952,7 +3072,18 @@ cerror:    sep     scall               ; get number fro stack
            glo     rb                  ; get returned value
            lbr     execret             ; return to caller
 
-
+cef:       ldi     0                   ; start with zero
+	   phi rb
+           bn1     cef1                ; jump if ef1 not on
+           ori     1                   ; signal ef1 is on
+cef1:      bn2     cef2                ; jump if ef2 ot on
+           ori     2                   ; signal ef2 is on
+cef2:      bn3     cef3                ; jump if ef3 not on
+           ori     4                   ; signal ef3 is on
+cef3:      bn4     cef4                ; jump if ef4 not on
+           ori     8
+cef4:                       
+	   lbr goodpushb0
 
 cout:      sep     scall               ; get value from stack
            dw      pop
@@ -3065,7 +3196,7 @@ cspat:     mov     r8,fstack           ; get stack address pointer
 ; -----------------------------------------------------------------
 ccmove:    sep     scall               ; get top of stack
            dw      pop
-ccmerr:          lbdf    error               ; jump if error
+           lbdf    error               ; jump if error
            mov     rc,rb               ; rc is count of bytes
            sep     scall               ; get top of stack
            dw      pop
@@ -3073,13 +3204,13 @@ ccmerr:          lbdf    error               ; jump if error
            mov     r8,rb               ; r8 is destination address
            sep     scall               ; get top of stack
            dw      pop
-           bdf    ccmerr               ; jump if error
+ccmerr:   lbdf    error               ; jump if error
            mov     r7,rb               ; r7 is source address
 
            ; transfer data
            ; begin check for zero byte count else tragedy could result
 cmovelp:   glo     rc
-           bnz    cmovestr
+           lbnz    cmovestr
            ghi     rc
            lbz good
 cmovestr:  lda     r7
@@ -3092,7 +3223,7 @@ cmovestr:  lda     r7
 
 csetq:     sep     scall               ; get top of stack
            dw      pop
-           bdf    ccmerr               ; jump if error
+           lbdf    error               ; jump if error
            glo     rb                  ; get low of return value
            bz qoff
            seq
@@ -3135,7 +3266,7 @@ xyerr:     lbdf    error               ; jump if error
            mov     rd,rb               ; rd is Y coord (row)
            sep     scall               ; get top of stack
            dw      pop
-           bdf    xyerr               ; jump if error
+           lbdf    error               ; jump if error
            mov     r8,rb               ; r8 is X coord (col)
 
            ; send CSI sequence
@@ -3172,7 +3303,7 @@ xyerr:     lbdf    error               ; jump if error
            ; type ending char
            ldi     'H'
            lbr     gooddisp
-
+ 
 
 ; -----------------------------------------------------------------------------
 ; 'C' style operators for bit shifting, note no range check on number of shifts
@@ -3629,9 +3760,9 @@ typeout:   ldi     ' '                 ; add space
 ; *************************************
 isnum:     plo     re                  ; save a copy
            smi     '0'                 ; check for below zero
-           bnf    fails               ; jump if below
+          lbnf    fails               ; jump if below
            smi     10                  ; see if above
-           bdf    fails               ; fails if so
+           lbdf    fails               ; fails if so
 passes:    smi     0                   ; signal success
            lskp
 fails:     adi     0                   ; signal failure
@@ -3650,17 +3781,17 @@ err:       smi     0                   ; signal an error
 ishex:     sep     scall               ; see if it is numeric
            dw      isnum
            plo     re                  ; keep a copy
-           bdf    passes              ; jump if it is numeric
+           lbdf    passes              ; jump if it is numeric
            smi     'A'                 ; check for below uppercase a
            bnf    fails               ; value is not hex
            smi     6                   ; check for less then 'G'
-           bnf    passes              ; jump if so
+           lbnf    passes              ; jump if so
            glo     re                  ; recover value
            smi     'a'                 ; check for lowercase a
            bnf    fails               ; jump if not
            smi     6                   ; check for less than 'g'
-           bnf    passes              ; jump if so
-           br     fails
+           lbnf    passes              ; jump if so
+           lbr     fails
 
 
 
@@ -3679,9 +3810,9 @@ clrmemlp:  ldi     0h
            inc     rc
            dec     r7
            glo     r7
-           bnz    clrmemlp
+           lbnz    clrmemlp
            ghi     r7
-           bnz    clrmemlp
+           lbnz    clrmemlp
            rtn
 
 
@@ -3698,7 +3829,7 @@ inkey:  ldi     015h            ; need UART line status register
         dec     r2              ; correct for inc on out
         inp     UART_DATA       ; read line status register
         ani     1               ; mask for data ready bit
-        bz     nokey           ; return if no bytes to read
+        lbz     nokey           ; return if no bytes to read
         ldi     010h            ; select data register
         str     r2              ; prepare for out
         out     UART_SELECT     ; write to register select port
@@ -3716,7 +3847,7 @@ clist:	mov r7,storage
 clist0:
 	push r7
 	ldn r7
-	bnz clist1
+	lbnz clist1
 	inc r7
 	ldn r7
 	bnz clist1
@@ -3735,7 +3866,7 @@ clist1:
 	plo r7
 	ghi rb
 	phi r7
-	br clist0
+	lbr clist0
 	
 
 
@@ -3794,15 +3925,8 @@ randbyte:   mov rd,rseed
             rtn
 
 
-freememr9:
-        ldi low freemem
-        plo r9
-        ldi high freemem
-        phi r9
-        rtn    
-
-chere:  sep scall
-        dw freememr9
+chere:     ldi low freemem                ; set R9 to free memory
+           plo r9
         lda r9
         phi rb
         ldn r9
@@ -3812,8 +3936,8 @@ chere:  sep scall
 ctohere: sep scall
          dw pop
          lbdf error
-         sep scall
-         dw freememr9
+         ldi low freemem                ; set R9 to free memory
+         plo r9
          ghi rb
          str r9
          inc r9
@@ -3827,6 +3951,7 @@ ctohere: sep scall
 
 hello:     db      'Rc/Forth 0.4'
 crlf:      db       10,13,0
+aprompt:   db      ':'               ; no zero, adds to prompt (must be right before prompt)
 prompt:    db      'ok ',0
 msempty:   db      'stack empty',10,13,0
 msgerr:    db      'err',10,13,0
