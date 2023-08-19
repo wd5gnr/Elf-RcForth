@@ -14,6 +14,10 @@ What's new
 ----------
 Verson 0.4 
 
+See rambuild.sh to build a version you can load to RAM at 0 with a ROM at 8000. You can configure in forth.asm for other configurations.
+
+Restructured BLOAD words
+
 You can use multiple line colon definitions (see examples/hilomulti.4th). If you are defining a word, the prompt will be :ok instead of ok.
 Note the multiple lines are not stored. You wind up with the same definition either way.
 
