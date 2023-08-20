@@ -243,6 +243,7 @@ FHERE:     equ     FNEW+1
 FTOHERE:   equ     FHERE+1
 FBASE:     equ     FTOHERE+1
 FENDIF     equ     FBASE+1
+FRSEED:    equ     FENDIF+1
 
 T_EOS:     equ     253  ; end of command line
 T_NUM:     equ     255
@@ -2686,7 +2687,7 @@ seeeven:
         phi rb 
 seeodd:
 	sep scall
-	dw typenumind   	; print data
+	dw typenumind 	; print data
 	pop rb
 	pop r7
 	push r7
@@ -2776,6 +2777,7 @@ cseefunc:  ldi     ':'                 ; start with a colon
 seefunclp: ldi     ' '                 ; need a space
            sep     scall               ; display character
            dw      disp
+seefunclpns:
            ldn     r7                  ; get next token
            lbz     seeexit             ; jump if done
            smi     T_ASCII             ; check for ascii
@@ -2812,7 +2814,8 @@ seenota:   ldn     r7                  ; reget token
            phi     r7
            ldx
            plo     r7
-           lbr     seenext             ; on to next token
+           inc r7
+           lbr seefunclpns             ; next token with no space
 seenotn:   ldi     high cmdtable       ; point to command table
            phi     rb
            ldi     low cmdtable
@@ -3672,8 +3675,14 @@ cbye:      lbr     exitaddr
 
 cbase:     ldi low basev
            plo rb
-           ldi high basev
+           ldi high basev    ; don't use mov so we can save a byte by calling goodpushb
            lbr goodpushb
+
+crseed:    ldi low rseed
+           plo rb 
+           ldi high rseed      ; don't use mov so we can save a byte by calling goodpushb
+           lbr goodpushb
+                     
            
 
 #ifdef ELFOS
@@ -3724,9 +3733,11 @@ touc_qlp:  lda     rf                  ; get next character
            lbr     touc_qlp            ; otherwise keep looking
 
 
+
 ; [GDJ] type out number according to selected BASE and signed/unsigned flag
-typenumind:   ; get BASE  ; enter here to have 0x or 0# put on front
+typenumind:   
         push    rf                  ; save rf for tokenizer
+typenos:
 	ldi '0'
 	sep scall
 	dw disp
@@ -3776,6 +3787,7 @@ hexbyte:   sep     scall
 typeout:   ldi     ' '                 ; add space
            str     rf
            inc     rf
+nospace:
            ldi     0                   ; and terminator
            str     rf
            mov     rf, buffer
@@ -4067,6 +4079,7 @@ cmdtable:  db      'WHIL',('E'+80h)
            db      '->HER',('E'+80h)
            db      'BAS',('E'+80h)
            db      'ENDI',('F'+80h)
+           db      'RSEE',('D'+80h)
            db      0                   ; no more tokens
 
 cmdvecs:   dw      cwhile              ; 81h
@@ -4151,6 +4164,7 @@ cmdvecs:   dw      cwhile              ; 81h
            dw      ctohere       
            dw      cbase
            dw      cthen                ; alias ENDIF=then (as in gforth)
+           dw      crseed
 
 
 	

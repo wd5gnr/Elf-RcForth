@@ -14,6 +14,10 @@ What's new
 ----------
 Verson 0.4 
 
+No extra spaces in SEE/LIST
+
+RSEED lets you view/store the random number generation seed
+
 See rambuild.sh to build a version you can load to RAM at 0 with a ROM at 8000. You can configure in forth.asm for other configurations.
 
 Restructured BLOAD words
@@ -171,6 +175,7 @@ EMITP    (a -- )          - print top of stack as printable character
 
 Others:
 -------
+\                         - Comment from here to end of line (needs space after it; not \comment but \ comment)
 CR       ( -- )           - Print a CR/LF pair
 MEM      ( -- a)          - return amount of memory
 WORDS    ( -- )           - Display vocabulary words
@@ -179,9 +184,10 @@ LIST     ( -- )           - See all dictionary words/variables
 FORGET name               - Remove a variable or function
 ." text "                 - Print specified text on the terminal
 KEY      ( -- v)          - Read a char from the keyboard and place on stack
-KEY?     ( -- ?)          - Non blocking keyboard read returns 1 if pressed else 0
+KEY?     ( -- ?)          - Non blocking keyboard read returns 1 if pressed else 0 (does not work with bit-bang serial)
 SETQ     (n -- )          - Set Q line hi/lo for n 1/0 
 BASE     ( -- addr)       - Address containing the current numeric radix
+RSEED    ( -- addr)       - Address of 32-bit random number seed
 DECIMAL  ( -- )           - Set the numeric radix to 10 (takes effect next input line)
 HEX      ( -- )           - Set the numeric radix to 16 (takes effect next input line)
 DELAY    (n --)           - Blocking delay of n milliseconds
