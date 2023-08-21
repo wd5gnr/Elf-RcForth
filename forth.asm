@@ -47,13 +47,59 @@
               ; e.g. VARIABLE X X 0 ! -- does not work (now throws an error)
               ; on a word def is ignored also  (now throws an error)
               ;
-              ; To catch all these we now define T_TOS 0xFD. The tokenizer marks the end of string with it
+              ; To catch all these we now define T_EOS 0xFD. The tokenizer marks the end of string with it
               ; and most things ignore it. But colon and varible use it to make sure the string is
               ; complete and doesn't have too much stuff in it, also. As an extra feature, we now
               ; zero out new variables (but not the allot part)s
+
+              ; The old style BLOAD was binary and wipes out your variables
+              ; The new style BLOAD takes text strings (more space) but doesn't wipe out variables
+              ; Of course, you can reduce space on text by easily removing definitions you 
+              ; don't want or need which is harder to do with the binary BLOAD
+              ; Doesn't need to change based on RAM addresses
+              ; And let's your run things not just define words/variables
+              ; Pick one or the other here. Or define NO_BLOAD to make BLOAD act like LOAD
+              ; (that is, XMODEM load)
+              ; DO NOT DEFINE BLOAD_TEXT and BLOAD_BIN!
+              ; BLOAD_AUTO, if defined, makes us run BLOAD at startup (turn off if using NO_BLOAD)
+              ; Unless you define NO_TOKEN_COMPRESSION then
+              ; The parser will take anything >=80h as a token directly
+              ; This allows you to make files (or BLOAD data) that use tokenized or ASCII core words
+              ; Example:
+              ;   db  FCOLON,'ABC ',FSWAP,FDROP,FSEMI,0
+              ;
+              ; You don't HAVE to use the tokens, and you can mix and match
+              ; However, if you wanted to put these in the data stream
+              ; You'd need to set NO_TOKEN_COMPRESSION to allow that data to pass through
+              ; Not sure what the use case for that would be, however.
+
+
+; pick EXACTLY one of the next three
+;#define NO_BLOAD
+#define BLOAD_TEXT
+;#define BLOAD_BIN
+
+#ifndef NO_BLOAD
+#define BLOAD_AUTO
+#else
+#ifdef BLOAD_TEXT
+#undef BLOAD_TEXT
+#endif
+
+#ifdef BLOAD_BIN
+#undef BLOAD_BIN
+#endif
+
+#ifdef BLOAD_AUTO
+#undef BLOAD_AUTO
+#endif
+
+#endif
+
+
 ; For a RAM build you need to set all this up yourself
 ; you do need BIOS somewhere and if you don't have XMODEM then don't use those commands!
-; we assume you have BIOS.INC (since you have a BIOS and that it is correct)
+; we assume you have BIOS.INC (since you have a BIOS) and that it is correct
 #ifdef        RAM
 #define       ANYROM
 #define       CODE          06600h
@@ -209,7 +255,23 @@ FALLOT:       equ           FKEYQ+1
 FERROR:       equ           FALLOT+1
 FSEE:         equ           FERROR+1
 FFORGET:      equ           FSEE+1
-FEXEC:        equ           FFORGET+1
+FOUT:         equ           FFORGET+1
+FINP:         equ           FOUT+1
+FEF:          equ           FINP+1
+FSETQ:        equ           FEF+1
+FSAVE:        equ           FSETQ+1
+FLOAD:        equ           FSAVE+1
+FBYE:         equ           FLOAD+1
+FSPAT:        equ           FBYE+1
+FDECIMAL:     equ           FSPAT+1
+FHEX:         equ           FDECIMAL+1
+FLT:          equ           FHEX+1
+FGT:          equ           FLT+1
+FDELAY:       equ           FGT+1
+FBLOAD:       equ           FDELAY+1
+FGOTOXY:      equ           FBLOAD+1   ; should move to extended
+FRAND:        equ           FGOTOXY+1
+FEXEC:        equ           FRAND+1
 FLIST:        equ           FEXEC+1
 FDOTX:        equ           FLIST+1
 FNEW:         equ           FDOTX+1
@@ -291,7 +353,7 @@ start:        ldi           high himem           ; get page of data segment
               plo           r2
               call          fresh
               call          xnew
-#ifndef       NO_BLOAD
+#ifdef        BLOAD_AUTO
               lbr           cbload               ; should only do this on first time
 #else
               br            mainlp
@@ -661,7 +723,7 @@ mul16:        ldi           0                    ; zero out total
               phi           rc
               plo           rc
 mulloop:      glo           r7                   ; get low of multiplier
-              bnz           mulcont              ; continue multiplying if nonzero
+              lbnz           mulcont              ; continue multiplying if nonzero
               ghi           r7                   ; check hi byte as well
               bnz           mulcont
               mov           rb,r8
@@ -825,12 +887,15 @@ divno:        ghi           r7                   ; get hi of divisor
               shrc                               ; continue divide by 2
               plo           r8
               br            divst                ; next iteration
-;           org     300h
+
+            
+
+
 ; ***************************
 ; *** Setup for tokenizer ***
 ; ***************************
 tknizer:      mov           rb, buffer
-              ldi           low freemem          ; set R9 to free memory
+tknizerb:     ldi           low freemem          ; set R9 to free memory
               plo           r9
               lda           r9                   ; get free memory pointer
               phi           rf                   ; place into rF
@@ -858,6 +923,13 @@ tokenlp:      ldn           rb                   ; get byte from buffer
 ; ********************************************
 nonwhite:
               ldn           rb
+#ifndef NO_TOKEN_COMPRESSION
+              smi           07fh
+              lda           rb  
+              lbdf           copytoken
+              dec           rb
+              ldn           rb
+#endif              
               smi           '\'                  ; possible comment
               bnz           noncom
               inc           rb
@@ -922,6 +994,7 @@ cmdend:       ldn           r7                   ; get byte fro token
 ; *************************************************************
               glo           r8                   ; get command number
               ori           128                  ; set high bit
+copytoken:              
               str           rf                   ; write to command buffer
               inc           rf                   ; point to next position
               smi           FDOTQT               ; check for ." function
@@ -962,14 +1035,14 @@ notoken_0:
               ldn           rb
               inc           rb
               smi           'X'
-              bz            hexnum
+              lbz            hexnum
               br            decnum
 notokenbaseadj: dec           rb                   ; point back at 0
 notokenbase:
               mov           rd, basen
               ldn           rd
               smi           10
-              bnz           hexnum
+              lbnz           hexnum
 decnum:
               mov           rc,rb                ; save pointer in case of bad number
               ldi           0
@@ -1156,8 +1229,9 @@ tokendn:      ldi           T_EOS
               ldi           0                    ; need to terminate command string
               str           rf                   ; write to buffer
               rtn                                ; return to caller
-;           org     500h
-; ****************************************************
+  
+
+; **************************************************** 
 ; *** Execute forth byte codes, RB points to codes ***
 ; ****************************************************
 exec:
@@ -1246,7 +1320,7 @@ ascnoerr:     inc           r7                   ; point to type
               lbz           execvar              ; jump if so
               ldn           r7                   ; get type
               smi           FCOLON               ; check for function
-              bnz           ascerr               ; jump if not
+              lbnz           ascerr               ; jump if not
               glo           r8                   ; save position
               stxd                               ; and store on stack
               ghi           r8
@@ -1402,7 +1476,7 @@ goodpushb0:
 crat:
 ci:           call          rpop                 ; get value from return stack
               call          rpush                ; put it back
-              br            goodpush
+              lbr            goodpush
 cmem:
               ldi           low freemem          ; set R9 to free memory
               plo           r9
@@ -1666,9 +1740,9 @@ emitpout:     br            gooddisp
 cwhile:       call          pop
               lbdf          error                ; jump if error
               glo           rb                   ; need to check for zero
-              bnz           whileno              ; jump if not zero
+              lbnz           whileno              ; jump if not zero
               ghi           rb                   ; check high byte
-              bnz           whileno
+              lbnz           whileno
               mov           ra,r2
               inc           ra                   ; point to R[6]
               lda           ra                   ; get command stream
@@ -2319,15 +2393,15 @@ seelp3:       lda           rb                   ; get byte from token
               br            seelp3               ; keep looking
 seetoken:     ldn           rb                   ; get byte from token
               ani           128                  ; is it last
-              bnz           seetklast            ; jump if so
+              lbnz           seetklast            ; jump if so
               ldn           rb                   ; retrieve byte
               call          disp
               inc           rb                   ; point to next character
-              br            seetoken             ; and loop til done
+              lbr            seetoken             ; and loop til done
 seetklast:    ldn           rb                   ; retrieve byte
               ani           07fh                 ; strip high bit
               call          disp
-              br            seenext              ; jump for next token
+              lbr            seenext              ; jump for next token
 cdotqt:       mov           ra,r2
               inc           ra                   ; point to R[6]
               lda           ra                   ; and retrieve it
@@ -2483,7 +2557,7 @@ forgetlp1:    lda           rb                   ; get pointer
               ldn           rb
               plo           ra
               or                                 ; see if it was zero
-              bz            forgetd1             ; jump if it was
+              lbz            forgetd1             ; jump if it was
               glo           rc                   ; subtract RC from RA
               str           r2
               glo           ra
@@ -2496,7 +2570,7 @@ forgetlp1:    lda           rb                   ; get pointer
               smb
               str           rb
               mov           rb,ra
-              br            forgetlp1            ; loop until done
+              lbr            forgetlp1            ; loop until done
 forgetd1:     lda           r7                   ; get next entry
               phi           rb
               ldn           r7
@@ -2692,6 +2766,7 @@ f_msg_term:   ldi           0
               lbr           f_msg
 ; VT100 ansi control
 ; printf("%c[%d;%dH",ESC,y,x);
+; Note this directly calls f_uintout so should not matter if you are in hex mode or not
 cgotoxy:      call          pop
 xyerr:        lbdf          error                ; jump if error
               mov           rd,rb                ; rd is Y coord (row)
@@ -2793,7 +2868,7 @@ cexec0:       lbr           jump                 ; transfer to user code. If it 
 ; -----------------------------------------------------------------------------
 ; Load contents of dictionary - any session defined words/values will be zapped
 ; -----------------------------------------------------------------------------
-#ifndef       NO_BLOAD
+#ifdef BLOAD_BIN
 cbload:       push          rf
               push          rd
               push          rc
@@ -2813,6 +2888,31 @@ bloadlp:      lda           rf
               pop           rf
               lbr           mainlp               ; back to main loop
 #endif
+
+#ifdef BLOAD_TEXT
+cbload:       mov           rb,loadtext
+              br            cbload2
+cbload1:      pop           rb
+              inc           rb 
+cbload2:      ldn           rb
+              lbz           mainlp
+              ;call          dispf
+              ;db '.'  ; Just for debugging print a dot for each line loaded
+              call          tknizerb
+              push          rb
+              ldi           low freemem
+              plo           r9
+              lda           r9
+              phi           rb
+              ldn           r9
+              plo           rb
+              inc           rb
+              inc           rb
+              call          exec
+              lbr            cbload1  
+
+#endif
+
 ; -----------------------------------------------------------------
 #ifdef        ANYROM
 csave:        push          rf                   ; save consumed registers
@@ -3008,8 +3108,8 @@ touc_qt:      inc           rf                   ; move past quote
 touc_qlp:     lda           rf                   ; get next character
               bz            touc_dn              ; exit if terminator found
               smi           022h                 ; check for quote charater
-              bz            touc                 ; back to main loop if quote
-              br            touc_qlp             ; otherwise keep looking
+              lbz            touc                 ; back to main loop if quote
+              lbr            touc_qlp             ; otherwise keep looking
 ; [GDJ] type out number according to selected BASE and signed/unsigned flag
 typenumind:
               push          rf                   ; save rf for tokenizer
@@ -3023,11 +3123,11 @@ typenos:
               ldi           'x'
               lskp
 typenuminddec:
-              call          dispf
-              db            '#'
+              ldi           '#'
+              call          disp                 ; Do not use dispf here because we have an lskp above!
               ldi           0
               plo           re                   ; always unsigned here
-              br            typenumx
+              lbr            typenumx
 typenum:                                         ; get BASE  ; enter here for normal output
               push          rf                   ; save rf for tokenizer
 typenumx:
@@ -3040,9 +3140,9 @@ typenumx:
               glo           re
               bz            typenumU
               call          f_intout
-              br            typeout
+              lbr            typeout
 typenumU:     call          f_uintout
-              br            typeout
+              lbr            typeout
 typehex:
               mov           rd,rb
               mov           rf, buffer
@@ -3374,26 +3474,40 @@ cmdvecs:      dw            cwhile               ; 81h
               dw            cthen                ; alias ENDIF=then (as in gforth)
               dw            crseed
 #ifdef        STGROM
-#define       EBLOCK
-#define       STGROMBLOAD
+#define       EBLOCK 
+#define       STGROMBLOAD  
 #endif
-#ifdef        RAM
-#define       EBLOCK
+#ifdef        RAM  
+#define       EBLOCK 
 #define       RAMBLOAD
 #endif
 #ifdef        NO_BLOAD
 #undef        EBLOCK
 #endif
-#ifdef        EBLOCK
+
+#ifdef BLOAD_TEXT
+loadtext:
+   include extended.inc
+#ifdef STGROMBLOAD
+#undef STGROMBLOAD
+#endif
+#ifdef RAMBLOAD
+#undef RAMBLOAD
+#endif
+#endif
+
+#ifdef BLOAD_BIN
 extblock:
 #endif
+
 #ifdef        STGROMBLOAD
               include       stgrombload.inc
 #endif
 #ifdef        RAMBLOAD
               include       rambload.inc
 #endif
-#ifdef        EBLOCK
+
+#ifdef        BLOAD_BIN
 endextblock:
 #endif
 endrom:       equ           $

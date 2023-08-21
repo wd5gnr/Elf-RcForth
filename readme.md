@@ -14,6 +14,8 @@ What's new
 ----------
 Verson 0.4 
 
+More BLOAD options. A few new extended words when using the new BLOAD.
+
 No extra spaces in SEE/LIST
 
 RSEED lets you view/store the random number generation seed
@@ -194,7 +196,7 @@ DELAY    (n --)           - Blocking delay of n milliseconds
 SAVE     ( -- )           - Save dictionary to terminal via Xmodem
 LOAD     ( -- )           - Load dictionary to terminal via Xmodem
 BLOAD    ( -- )           - Load extensions as binary block included in src code (note: resets to decimal before loading and leaves you in decimal mode) This happens automatically. If you don't want these functions, use NEW (see below).
-GOTOXY   (x y -- )        - Position the cursor at x,y
+GOTOXY   (x y -- )        - Position the cursor at x,y (works even in hex mode)
 RAND     ( -- b)          - Returns random byte
 EXEC     ( a -- r )       - Do an SCRT call to machine language at address a; Value of RB on return pushed on stack
 OUT      ( b p -- )       - Output byte b to port p (e.g., 4 0xaa out)
@@ -271,12 +273,44 @@ CLEAR    ( -- )                     - Clears the stack of all entries
 .S       ( -- )                     - Display entire contents of stack
 TYPE     (addr n -- )               - Display n bytes at addr
 DUMP     (addr n -- )               - Display n bytes at addr as 16 byte records
-CELLS    ( n -- 2n )                - Converts array index into byte offset
-,        ( a d -- a+2 )             - Use after array definition; see notes
-c,       ( a b -- a+1 )             - Use after array definition; see notes
+CELLS    (n -- 2n)                  - Converts array index into byte offset
+,        (a d -- a+2)               - Use after array definition; see notes
+c,       (a b -- a+1)               - Use after array definition; see notes
+BASEOUT  (n b --)                   - Output number n in base b (preserves BASE)
+#.       (n -- )                    - Output number n in decimal regardless of BASE
+$.       (n -- )                    - Output number n in hex regardless of BASE
 
 Notes:
 ------
+
+BLOAD has changed by default, but you can put it back or remove it. 
+
+The previous state was BLOAD loaded a binary blob that included address and all the state variables. So it wipes out everything
+and requires fixing if you add/delete/rearrange variables or move the RAM base address. It was hard to add things to the BLOB.
+
+You can restore this behavior at the top of forth.asm by defining BLOAD_BIN and undefining BLOAD_TEXT. The blobs have been moved to two parts. A build-specific header
+and a RAM base list of words. In other words, all machines with RAM at 0 can share the words even if they need different headers for setting
+variables. You can also shut off BLOAD with NO_BLOAD (the BLOAD work becomes a synonym with LOAD, in that case, and does not auto run).
+
+The new behavior allows you to put nearly any command you want as 0 separated strings into extended.inc. These can define words, variables, or execute words.
+By default, the system does a BLOAD when you start up (disable it by removing the BLOAD_AUTO flag). The end of the strings has a terminating 0 in addition to 
+the last's string's terminating zero. See external.inc for examples. You can also do a BLOAD anytime which might make sense after a NEW, for example. Unlike
+the old BLOAD, the new BLOAD does not wipe out what you already have.
+
+The only problem is the text can get large. Unless you define NO_TOKEN_COMPRESSION you can use normal command tokens at will in the file to reduce the size.
+For example:
+
+: makeeven dup 1 and if 1+ then ;
+
+You can store this as is (just put a zero at the end). But you can also do this:
+FCOLON,'makeeven ',FDUP,'1 ',FAND,FIF,'1+ ',FTHEN, FSEMI,0
+
+This includes the end zero. Note that you have to use strings for numbers and non-core words like 1+. You can mix and match as much as you want.
+Do not use T_NUM, T_STR, or FDOTQT when using the tokenized mode. All of the tokens are at the top of the forth.asm file.
+
+XXXX
+
+
 I noticed that the documentation for all the comparison operators looks backwards and is backwards from gforth. 
 What's more is that equality parts are messed up also. This WILL WILL BREAK YOUR CODE from earlier versions. In the same vein. Jolly fixed UNTIL to work properly 
 and that also breaks old code.
@@ -297,23 +331,40 @@ ok 5 5 < .
 This appears to be in the original Jolly implement of cless and culess (flipped DF). Fixed now (maybe) but will break code and
 probably breaks some of the examples (will be fixed).
 
-BLOAD resets the system to decimal before loading.
+XXXX
+
+old-style BLOAD resets the system to decimal before loading.
+
+XXXX
 
 DUMP really prefers hex mode for formatting
 
+XXXX
+
 If you are in hex mode, a, b, c, d, e, and f are not words. So "VARIABLE A" will fail in hex mode. So will abc, for example.
+
+XXXX
 
 Nothing is executed after VARIABLE xxx. That means:
 VARIABLE foo 100 allot
 Does NOT do what you think it does. End the line after the foo.
 
+XXXX
+
 SEE emits all integers as unsigned with 0x or 0# prefixes to faciliate reloading correctly
 This means that -1 test ! see test will show 0#65535 not -1 but those are the same thing.
+
+XXXX
 
 HEX and DECIMAL don't work until AFTER the line is parsed. So you can't say:
 : doit hex 0f 2 * ;
 
 Unless you were already in hex, of course. The hex command would only affect the NEXT line.
+
+However, they do work with output. So a possible definition is:
+: HEXOUT 0x10 BASE @ -ROT BASE ! . BASE ! ;   \ print number in hex and put BASE back to how it was
+
+XXXX
 
 To create an array, you can use the comma or c, operators. However, unlike
 normal Forth, you must do it on a second line. Suppose you want to create an 
@@ -340,11 +391,15 @@ PGM 0x7A c, 0x7B c, 0xD5 CSTORE
 
 Previous code that used word-sized ALLOT will break
 
+XXX
+
 Comments and line breaks are not stored
 
-In see/list the extra space after numbers is an artifact of how they are printed. This maybe fixed in the future.
+XXX
 
+In see/list the extra space after numbers is an artifact of how they are printed. This maybe fixed in the future. (fixed)
 
+XXXX
 
 Forth Tutorial:
 ---------------
