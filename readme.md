@@ -14,6 +14,8 @@ What's new
 ----------
 Verson 0.4 
 
+New extended words. OVER bug fixed.
+
 0 DELAY now returns immediately instead of acting like 0x10000 DELAY
 
 More BLOAD options. A few new extended words when using the new BLOAD.
@@ -281,6 +283,7 @@ c,       (a b -- a+1)               - Use after array definition; see notes
 BASEOUT  (n b --)                   - Output number n in base b (preserves BASE)
 #.       (n -- )                    - Output number n in decimal regardless of BASE
 $.       (n -- )                    - Output number n in hex regardless of BASE
+%.       (n -- )                    - Output number n in binary 
 
 Notes:
 ------

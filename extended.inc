@@ -91,8 +91,12 @@
 ; db ': foo swap drop ;',0
 ; is the same as:
 ; db FCOLON,'foo ',FSWAP,FDROP,FSEMI,0
-; NOTE: Do not use T_NUM or T_STRING here
-; Also do not use FDOTQT
+; NOTE: tokens must end in space. So note the above is 'foo ',FSWAP NOT 'foo',FSWAP!
+; Also FDOTQT is "odd":  dw FDOTQT,' <-space not printed"100 2 + ',FDOT,FCR,0
+; Note the first space is "eaten" and the quote ends the string (no zero), and you do NOT need 
+; a space after the quote (although it won't hurt if you do)
+; You can also use T_NUM:  db T_NUM,0,0ffh   ; 255
+; or T_ASCII: db FCOLON,T_ASCII,'FOO',0,....
 
   db FCOLON,'+! TUCK ',FAT,FPLUS,FSWAP,FEXCL,FSEMI,0
   db FCOLON,'-! NEG +! ',FSEMI,0
@@ -138,7 +142,7 @@
   db FCOLON,'FILL ',FSWAP,FGTR,FOVER,FCEXCL,FDUP,'1+ ',FRGT,'1- CMOVE ',FSEMI,0
   db FCOLON,'FREE ',FMEM,FUDOT,FCR,FSEMI,0
   db FCOLON,'GETBIT >> 1 ',FAND,FSEMI,0
-  db FCOLON,'INVERT 0XFFFF ,,FXOR,FSEMI,0
+  db FCOLON,'INVERT ',T_NUM,0ffh,0ffh,FXOR,FSEMI,0
   db FCOLON,'LSHIFT ',FDUP,FWHILE,FSWAP,'2 ',FMUL,FSWAP,'1- ',FDUP,FREPEAT,FDROP,FSEMI,0
   db FCOLON,'MAX 2DUP < SWAP? ',FDROP,FSEMI,0
   db FCOLON,'MIN 2DUP > SWAP? ',FDROP,FSEMI,0
@@ -149,7 +153,7 @@
   db FCOLON,'PICK 2 * 2+ ',FSPAT,FPLUS,FAT,FSEMI,0
   db FCOLON,'RSHIFT ',FDUP,FWHILE,FSWAP,'2 ',FDIV,FSWAP,'1- ',FDUP,FREPEAT,FDROP,FSEMI,0
   db FCOLON,'SETBIT 1 ',FSWAP,'<< ',FOR,FSEMI,0
-  db FCOLON,'SGN ',FDUP,FIF,'0X8000 ',FAND,FIF,'0XFFFF ',FELSE,'1 ',FTHEN,FTHEN FSEMI,0
+  db FCOLON,'SGN ',FDUP,FIF,'0X8000 ',FAND,FIF,T_NUM,0ffh,0ffh,FELSE,'1 ',FTHEN,FTHEN FSEMI,0
   db FCOLON,'SPACE 0#32 ',FEMIT,FSEMI,0
   db FCOLON,'SPACES 0 ',FDO,'0#32 ',FEMIT,FLOOP,FSEMI,0
   db FCOLON,'SWAP? ',FIF,FSWAP,FTHEN,FSEMI,0 
@@ -165,8 +169,29 @@
   db FCOLON,'BASEOUT ',FBASE,FAT,FMROT,FBASE,FEXCL,FDOT,FBASE,FEXCL,FSEMI,0
   db FCOLON,'#. 0#10 BASEOUT ;',0
   db FCOLON,'$. 0X10 BASEOUT ;',0
+  db FCOLON,'%. 0X8000 BEGIN 2DUP AND IF 0X31 ELSE 0X30 THEN EMIT 1 >> DUP NOT UNTIL SPACE ;',0
   include custom.inc
   db '." Ext words loaded" CR',0
+  db 'INIT',0
 #endif
 
   db  0
+
+
+; possible new words:
+; RDROP
+; RPICK
+; RDEPTH
+; 2NIP
+; 2TUCK
+; 2ROT
+; 2-ROT
+; sp!
+; rp@
+; rp!
+; arshift
+; ror, rol
+; clz - count leading zeros
+; even - make even
+; 2*
+; 2/

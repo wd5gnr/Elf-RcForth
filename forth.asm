@@ -910,9 +910,37 @@ tokenlp:      ldn           rb                   ; get byte from buffer
 nonwhite:
               ldn           rb
 #ifndef NO_TOKEN_COMPRESSION
+              smi           T_NUM                 ; check for T_NUM
+              bnz           tkstrck
+              lda           rb                   ; load tokenized number
+              str           rf
+              inc           rf
+              lda           rb
+              str           rf
+              inc           rf
+              lda           rb
+copytoken:              
+              str           rf
+              inc           rf
+              br            tokenlp              ; go get more 
+
+tkstrck:                                        ; test for string token
+              ldn           rb
+              smi           T_ASCII
+              bnz           tkcompck
+tkstrcpy:
+              lda           rb                  ; found a string
+              str           rf
+              inc           rf
+              bnz           tkstrcpy
+              br            tokenlp
+
+
+tkcompck:              
+              ldn           rb              
               smi           07fh
               lda           rb  
-              lbdf          copytoken
+              lbdf           copycmdtk           ; will handle ." but needs a space after: db FDOTQT,20h,T_ASCII,'foo"',...
               dec           rb
               ldn           rb
 #endif              
@@ -947,7 +975,7 @@ tokloop:      ldn           r7                   ; get byte from token table
               bnz           toknomtch            ; jump if no match
               inc           r7                   ; incrment token pointer
               inc           rb                   ; increment buffer pointer
-              br            tokloop              ; and keep looking
+              lbr            tokloop              ; and keep looking
 ; *********************************************************
 ; *** Token failed match, move to next and reset buffer ***
 ; *********************************************************
@@ -979,8 +1007,8 @@ cmdend:       ldn           r7                   ; get byte fro token
 ; *** Match found, store command number into command buffer ***
 ; *************************************************************
               glo           r8                   ; get command number
-              ori           128                  ; set high bit
-copytoken:              
+              ori           128                  ; set high bit            
+copycmdtk:
               str           rf                   ; write to command buffer
               inc           rf                   ; point to next position
               smi           FDOTQT               ; check for ." function
@@ -989,18 +1017,13 @@ copytoken:
               ldi           T_ASCII              ; need an ascii token
 tdotqtlp:     str           rf                   ; write to command buffer
               inc           rf
-              ldn           rb                   ; get next byte
-              smi           34                   ; check for end quote
+              smi           022h                 ; read to quote
               bz            tdotqtdn             ; jump if found
               lda           rb                   ; transfer character to code
               br            tdotqtlp             ; and keep looking
-tdotqtdn:     ldn           rb                   ; retrieve quote
-              str           rf                   ; put quote into output
-              inc           rf
-              ldi           0                    ; need string terminator
+tdotqtdn:     ldi           0                    ; need string terminator
               str           rf
               inc           rf
-              inc           rb                   ; move past quote
               lbr           tokenlp              ; then continue tokenizing
 ; ------------------------------------------------------------------------
 ;     DECIMAL handler  if not valid decimal then proceed to ascii        ;
@@ -1021,14 +1044,14 @@ notoken_0:
               ldn           rb
               inc           rb
               smi           'X'
-              bz            hexnum
+              lbz            hexnum
               br            decnum
 notokenbaseadj: dec           rb                   ; point back at 0
 notokenbase:
               mov           rd, basen
               ldn           rd
               smi           10
-              bnz           hexnum
+              lbnz           hexnum
 decnum:
               mov           rc,rb                ; save pointer in case of bad number
               ldi           0
@@ -1303,10 +1326,10 @@ ascnoerr:     inc           r7                   ; point to type
               inc           r7
               ldn           r7                   ; get type
               smi           FVARIABLE            ; check for variable
-              bz           execvar              ; jump if so
+              lbz           execvar              ; jump if so
               ldn           r7                   ; get type
               smi           FCOLON               ; check for function
-              bnz           ascerr               ; jump if not
+              lbnz           ascerr               ; jump if not
               glo           r8                   ; save position
               stxd                               ; and store on stack
               ghi           r8
@@ -1317,7 +1340,7 @@ ascnoerr:     inc           r7                   ; point to type
               phi           rb
               ldx
               plo           rb
-              br           exec                 ; and continue execution
+              lbr           exec                 ; and continue execution
 execvar:      call          push                 ; push var address to stack
               mov           rb,r8                ; address back to RB
               lbr           exec                 ; execute next code
@@ -1462,7 +1485,7 @@ goodpushb0:
 crat:
 ci:           call          rpop                 ; get value from return stack
               call          rpush                ; put it back
-              br            goodpush
+              lbr            goodpush
 cmem:
               ldi           low freemem          ; set R9 to free memory
               plo           r9
@@ -1747,9 +1770,9 @@ notwhile:     ldn           rb                   ; retrieve byte
               smi           FREPEAT              ; is it a repeat
               bnz           notrep               ; jump if not
               glo           r7                   ; get while count
-              bz            fndrep               ; jump if not zero
+              lbz            fndrep               ; jump if not zero
               dec           r7                   ; decrement count
-              br            notrep               ; and keep looking
+              lbr            notrep               ; and keep looking
 fndrep:       inc           rb                   ; move past the while
               glo           rb                   ; now put back into R[6]
               str           ra
@@ -1928,7 +1951,7 @@ cover:        call          pop                  ; get B
               mov           r7,rb
               call          pop                  ; get A
               lbdf          error                ; jump if error
-              mov           r7,rb
+              mov           r8,rb
               call          push                 ; put onto stack
               ghi           r7                   ; get B
               phi           rb
@@ -2045,7 +2068,7 @@ colonlp1:                                        ; lda     rb                  ;
               plo           r9
               ldn           r9
               xri           0C0h
-              lbz           colonpreline         ; single line
+              bz           colonpreline         ; single line
 ; end of multiline
               ldi           02
               str           r9
@@ -2387,7 +2410,7 @@ seetoken:     ldn           rb                   ; get byte from token
 seetklast:    ldn           rb                   ; retrieve byte
               ani           07fh                 ; strip high bit
               call          disp
-              br            seenext              ; jump for next token
+              lbr            seenext              ; jump for next token
 cdotqt:       mov           ra,r2
               inc           ra                   ; point to R[6]
               lda           ra                   ; and retrieve it
@@ -2543,7 +2566,7 @@ forgetlp1:    lda           rb                   ; get pointer
               ldn           rb
               plo           ra
               or                                 ; see if it was zero
-              bz            forgetd1             ; jump if it was
+              lbz            forgetd1             ; jump if it was
               glo           rc                   ; subtract RC from RA
               str           r2
               glo           ra
@@ -2556,7 +2579,7 @@ forgetlp1:    lda           rb                   ; get pointer
               smb
               str           rb
               mov           rb,ra
-              br            forgetlp1            ; loop until done
+              lbr            forgetlp1            ; loop until done
 forgetd1:     lda           r7                   ; get next entry
               phi           rb
               ldn           r7
@@ -2723,7 +2746,7 @@ cmovestr:     lda           r7
               str           r8
               inc           r8
               dec           rc
-              br            cmovelp
+              lbr            cmovelp
 csetq:        call          pop
               lbdf          error                ; jump if error
               glo           rb                   ; get low of return value
@@ -2903,7 +2926,7 @@ cbload2:      ldn           rb
               inc           rb
               inc           rb
               call          exec
-              lbr            cbload1  
+              br            cbload1  
 
 #endif
 
@@ -3128,7 +3151,7 @@ typenumx:
               mov           rd, basen
               ldn           rd
               smi           10
-              lbnz           typehex
+              bnz           typehex
               mov           rd,rb
               mov           rf, buffer
               glo           re
