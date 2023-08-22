@@ -82,6 +82,7 @@
   db ': BASEOUT BASE @ -ROT BASE ! . BASE ! ;',0
   db ': #. 0#10 BASEOUT ;',0
   db ': $. 0X10 BASEOUT ;',0
+  include custom.inc
   db '." Ext words loaded" CR',0
 #else
 ; You can put ASCII definitions/command here just as above
@@ -164,6 +165,7 @@
   db FCOLON,'BASEOUT ',FBASE,FAT,FMROT,FBASE,FEXCL,FDOT,FBASE,FEXCL,FSEMI,0
   db FCOLON,'#. 0#10 BASEOUT ;',0
   db FCOLON,'$. 0X10 BASEOUT ;',0
+  include custom.inc
   db '." Ext words loaded" CR',0
 #endif
 

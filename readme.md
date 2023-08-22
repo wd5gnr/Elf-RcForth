@@ -308,6 +308,9 @@ FCOLON,'makeeven ',FDUP,'1 ',FAND,FIF,'1+ ',FTHEN, FSEMI,0
 This includes the end zero. Note that you have to use strings for numbers and non-core words like 1+. You can mix and match as much as you want.
 Do not use T_NUM, T_STR, or FDOTQT when using the tokenized mode. All of the tokens are at the top of the forth.asm file.
 
+There is a custom.inc file that will be empty on GitHub. You can add your own defs there if you don't want them mixed in with
+the "factory default" words.
+
 XXXX
 
 
@@ -348,6 +351,24 @@ XXXX
 Nothing is executed after VARIABLE xxx. That means:
 VARIABLE foo 100 allot
 Does NOT do what you think it does. End the line after the foo.
+
+You also need to be careful with allot... 
+
+Suppose you create variable AAA:
+
+VARIABLE AAA
+
+Your memory now looks like this:
+<STUFF><AAA><END OF AAA><EMPTY SPACE>
+
+Now you enter the following:
+255 ALLOT AAA 200 0 FILL 10 2 + .
+
+Just after the ALLOT your memory now looks like:
+<STUFF><AAA><toenized version of 255 ALLOT AAA 200 0 FILL 10 2 + .><END OF AAA>
+
+So now, when FILL executes, it is going to wipe out your command line, so 10 2 + . is going to disappear.
+In this case, the zero gracefully ends it, but in other cases, not so much!
 
 XXXX
 
