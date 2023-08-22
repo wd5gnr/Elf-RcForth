@@ -8,11 +8,13 @@ RcForth forth-doc.txt
 By Mike Riley
 
 Previous  update : 24 May 2022  Glenn Jolly
-Last update: 19 Aug 2023 Al Williams
+Last update: 22 Aug 2023 Al Williams
 
 What's new
 ----------
 Verson 0.4 
+
+0 DELAY now returns immediately instead of acting like 0x10000 DELAY
 
 More BLOAD options. A few new extended words when using the new BLOAD.
 

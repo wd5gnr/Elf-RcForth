@@ -2825,7 +2825,14 @@ rshiftret:    mov           rb,r8
 ; delay for approx 1 millisecond on 4MHz 1802
 cdelay:       call          pop
               lbdf          error                ; jump if stack was empty
-              mov           r7,rb
+; 0 delay turns out to be the same as 0x10000 delay so special case it
+              glo           rb
+              plo           r7
+              bnz           delaynz
+              ghi           rb 
+              lbz           good
+delaynz:      ghi           rb                  ; redundant unless you skipped from above
+              phi           r7
 delaylp1:     ldi           60
 delaylp2:     nop
               smi           1
@@ -2836,6 +2843,7 @@ delaylp2:     nop
               ghi           r7
               lbnz          delaylp1
               lbr           good
+
 cexec:        call          pop
               lbdf          error
               mov           r8, jump             ; point to jump address
@@ -2895,7 +2903,7 @@ cbload2:      ldn           rb
               inc           rb
               inc           rb
               call          exec
-              br            cbload1  
+              lbr            cbload1  
 
 #endif
 
