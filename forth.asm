@@ -1041,7 +1041,8 @@ tkcomloop:
               bnz          tkcomloop
               lda          rb
               smi           (' '+1)              ; check for whitespace
-              bdf          tkcomloop             
+              bdf          tkcomloop   
+              dec          rb                    ; let tokenizer swallow the space (might be the last one)          
               lbr          tokenlp
 tksto:      
               glo           r8          
@@ -2648,20 +2649,20 @@ cseefunc:     call          dispf
 seefunclp:    call          dispsp
 seefunclpns:
               ldn           r7                   ; get next token
-              lbz            seeexit              ; jump if done
+              bz            seeexit              ; jump if done
               smi           T_ASCII              ; check for ascii
               lbnz           seenota              ; jump if not ascii
               inc           r7                   ; move into string
 seestrlp:     ldn           r7                   ; get next byte
-              lbz            seenext              ; jump if done with token
+              bz            seenext              ; jump if done with token
               call          disp
               inc           r7                   ; point to next character
-              lbr            seestrlp             ; and continue til done
+              br            seestrlp             ; and continue til done
 seenext:      inc           r7                   ; point to next token
               lbr            seefunclp
 seenota:      ldn           r7                   ; reget token
               smi           T_NUM                ; is it a number
-              lbnz           seenotn              ; jump if not a number
+              bnz           seenotn              ; jump if not a number
               inc           r7                   ; move past token
               lda           r7                   ; get number into rb
               phi           rb
@@ -2685,7 +2686,7 @@ seenotn:      mov           rb,cmdtable
               plo           r8                   ; token counter
 seenotnlp:    dec           r8                   ; decrement count
               glo           r8                   ; get count
-              lbz            seetoken             ; found the token
+              bz            seetoken             ; found the token
 seelp3:       lda           rb                   ; get byte from token
               ani           128                  ; was it last one?
               bnz           seenotnlp            ; jump if it was
@@ -2696,11 +2697,11 @@ seetoken:     ldn           rb                   ; get byte from token
               ldn           rb                   ; retrieve byte
               call          disp
               inc           rb                   ; point to next character
-              lbr            seetoken             ; and loop til done
+              br            seetoken             ; and loop til done
 seetklast:    ldn           rb                   ; retrieve byte
               ani           07fh                 ; strip high bit
               call          disp
-              lbr            seenext              ; jump for next token
+              br            seenext              ; jump for next token
 cdotqt:       mov           ra,r2
               inc           ra                   ; point to R[6]
               lda           ra                   ; and retrieve it
@@ -3151,7 +3152,7 @@ addat:
               adc
               lbr           goodpushb
 crpat:        mov           r8,rstack   
-              br            addat           
+              lbr            addat           
 ; -----------------------------------------------------------------
 ; additions April 2022  GDJ
 ; -----------------------------------------------------------------
