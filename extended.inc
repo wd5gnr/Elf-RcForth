@@ -55,6 +55,7 @@
   db ': FILL >R 2DUP 1- + R> SWAP C! SWAP DUP 1+ SWAP ROT 1- CMOVE ;',0
   db ': FREE MEM U. CR ;',0
   db ': GETBIT >> 1 AND ;',0
+  db ': J RP@ 6 + @ ;',0
   db ': INVERT 0XFFFF XOR ;',0
   db ': LSHIFT DUP WHILE SWAP 2 * SWAP 1- DUP REPEAT DROP ;',0
   db ': MAX 2DUP < SWAP? DROP ;',0
@@ -84,7 +85,7 @@
   db ': $. 0X10 BASEOUT ;',0
   db ': %. 0x8000 BEGIN 2DUP AND IF 0x31 ELSE 0x30 THEN EMIT 1 >> DUP NOT UNTIL SPACE ;',0
   include custom.inc
-  db '." Ext words loaded" CR',0
+  db '." Ext words loaded" CR INIT',0
 #else
 ; You can put ASCII definitions/command here just as above
 ; But you can also use the Fxxx words for core words.
@@ -143,6 +144,7 @@
   db FCOLON,'FILL ',FGTR,'2DUP 1- ',FPLUS,FRGT,FSWAP,FCEXCL,FSWAP,FDUP,'1+ ',FSWAP,FROT,'1- ',FCMOVE,FSEMI,0
   db FCOLON,'FREE ',FMEM,FUDOT,FCR,FSEMI,0
   db FCOLON,'GETBIT >> 1 ',FAND,FSEMI,0
+  db FCOLON,'J ',FRPAT,'6 + @ ',FSEMI,0
   db FCOLON,'INVERT ',T_NUM,0ffh,0ffh,FXOR,FSEMI,0
   db FCOLON,'LSHIFT ',FDUP,FWHILE,FSWAP,'2 ',FMUL,FSWAP,'1- ',FDUP,FREPEAT,FDROP,FSEMI,0
   db FCOLON,'MAX 2DUP < SWAP? ',FDROP,FSEMI,0

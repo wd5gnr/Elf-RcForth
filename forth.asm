@@ -281,6 +281,7 @@ FTOHERE:      equ           FHERE+1
 FBASE:        equ           FTOHERE+1
 FENDIF:       equ           FBASE+1
 FRSEED:       equ           FENDIF+1
+FRPAT:        equ           FRSEED+1
 T_EOS:        equ           253                  ; end of command line
 T_NUM:        equ           255
 T_ASCII:      equ           254
@@ -2815,6 +2816,7 @@ intable:
 ; [GDJ]
 cspat:        mov           r8,fstack            ; get stack address pointer
               ; get stack address
+addat:              
               lda           r8
               phi           rb
               ldn           r8
@@ -2831,6 +2833,8 @@ cspat:        mov           r8,fstack            ; get stack address pointer
               ghi           rb
               adc
               lbr           goodpushb
+crpat:        mov           r8,rstack   
+              br            addat           
 ; -----------------------------------------------------------------
 ; additions April 2022  GDJ
 ; -----------------------------------------------------------------
@@ -3528,6 +3532,7 @@ cmdtable:     db            'WHIL',('E'+80h)
               db            'BAS',('E'+80h)
               db            'ENDI',('F'+80h)
               db            'RSEE',('D'+80h)
+              db            'RP',('@'+80h)
               db            0                    ; no more tokens
 cmdvecs:      dw            cwhile               ; 81h
               dw            crepeat              ; 82h
@@ -3612,6 +3617,7 @@ cmdvecs:      dw            cwhile               ; 81h
               dw            cbase
               dw            cthen                ; alias ENDIF=then (as in gforth)
               dw            crseed
+              dw            crpat
 #ifdef        STGROM
 #define       EBLOCK 
 #define       STGROMBLOAD  

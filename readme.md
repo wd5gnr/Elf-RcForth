@@ -146,7 +146,7 @@ DO       (T S -- )        - Start of DO LOOP
 I        ( -- c)          - Put current loop count onto stack
 LOOP     ( -- )           - End of DO LOOP
 +LOOP    (v -- )          - End of loop with specified increment
-IF       (B -- )          - Beginnig of IF-ELSE-THEN structure
+IF       (B -- )          - Beginning of IF-ELSE-THEN structure
 ELSE     ( -- )           - ELSE portion of IF-ELSE-THEN
 THEN     ( -- )           - End of IF-ELSE-THEN
 ENDIF    ( -- )           - Same as THEN
@@ -159,13 +159,14 @@ Variables:
 ----------
 VARIABLE name                   - Create a variable (not allowed in functions)
 @        (a -- v)               - Retrieve value from address
-SP@      (a -- )                - Get address of tos pointer
+SP@      ( -- a)                - Get address of tos pointer
+RP@      ( -- a)                - Get address of return stack
 !        (v a -- )              - Store value at address
 C@       (a -- v)               - Retrieve byte value from address
 C!       (v a -- )              - Store byte value at address
 ALLOT    (n -- )                - Increase the last defined vars storage space (Note in bytes now; see CELLS in extended words)
 CMOVE    (caddr1 caddr2 u -- )  - Move u bytes from caddr1 to caddr2
-HERE     ( -- a)                - Retreive the current free memory pointer
+HERE     ( -- a)                - Retrieve the current free memory pointer
 ->HERE   (a -- )                - Set the current free memory pointer (dangerous!)
 
 
@@ -185,7 +186,7 @@ ROT      (a b c -- b c a) - Rotate 3rd stack item to top
 DEPTH    ( -- a)          - Get number of items on stack
 .        (a -- )          - print top of stack as signed integer
 U.       (a -- )          - print top of stack as unsigned integer
-X.	 (a -- )          - print top of stack as unsigned integer with 0x or 0# prefix 
+X.	 (a -- )              - print top of stack as unsigned integer with 0x or 0# prefix 
 EMIT     (a -- )          - print top of stack as ascii character
 EMITP    (a -- )          - print top of stack as printable character
 
@@ -285,6 +286,7 @@ BYTESWAP (b1b2 -- b2b1)             - Endian conversion for 16 bit int
 FILL     (addr n ch -- )            - Fill n bytes with ch starting at addr
 ERASE    (addr n -- )               - Zero n bytes of memory starting at addr
 CLEAR    ( -- )                     - Clears the stack of all entries
+J        ( -- j )                   - Get loop counter from outer loop
 .S       ( -- )                     - Display entire contents of stack
 TYPE     (addr n -- )               - Display n bytes at addr
 DUMP     (addr n -- )               - Display n bytes at addr as 16 byte records
