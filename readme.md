@@ -8,12 +8,37 @@ RcForth forth-doc.txt
 By Mike Riley
 
 Previous  update : 24 May 2022  Glenn Jolly
-Last update: 23 Aug 2023 Al Williams
+Last update: 24 Aug 2023 Al Williams
 
 What's new
 ----------
 Verson 0.4 
 
+By default USE_CBUFFER is enabled. This uses 256 bytes of RAM as a compile buffer.
+So your line is compiled to the buffer and executed. That means colon definitions 
+and variables are created in normal memory and don't step on your commands.
+This handily prevents problems with ALLOT as described below.
+
+However, it is a big change so you can compile with it off if you prefer the old behavior.
+
+You can now put ( ) comments in files you plan to load. They are not saved (same as \ comments).
+So:
+
+: FOO ( a -- 2a ) 2 * ;  \ You can have this exact line in  a file and the comments are ignored
+
+Note the parens are tokens, so you can't have:
+
+(My comment)
+
+However, you can have:
+( My comment (see other comments here) )
+
+The first ) doesn't "work" becuase it does not have <space>)<space>
+
+
+Obviously, don't use FOPAREN in compressed tokens for extended.inc or custom.inc -- makes no sense!
+
+---
 
 I have had to back away from the "safe" ALLOT since this is more complex than it appears. 
 The issue is if you have something like:

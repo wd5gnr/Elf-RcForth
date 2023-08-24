@@ -79,6 +79,9 @@
 #define BLOAD_TEXT
 ;#define BLOAD_BIN
 
+; if you want to compile to a separate "compile buffer" define this
+#define USE_CBUFFER
+
 #ifndef NO_BLOAD
 #define BLOAD_AUTO
 #else
@@ -168,7 +171,12 @@ stack:        equ           00ffh
 exitaddr:     equ           o_wrmboot
 #else
 buffer:       equ           RAMBASE+0200h
+#ifdef USE_CBUFFER
+cbuffer:      equ           RAMBASE+0300h
+himem:        equ           RAMBASE+0400h
+#else
 himem:        equ           RAMBASE+0300h
+#endif
 rstack:       equ           himem+2
 tos:          equ           rstack+2
 freemem:      equ           tos+2
@@ -282,6 +290,8 @@ FBASE:        equ           FTOHERE+1
 FENDIF:       equ           FBASE+1
 FRSEED:       equ           FENDIF+1
 FRPAT:        equ           FRSEED+1
+FOPAREN:      equ           FRPAT+1
+
 T_EOS:        equ           253                  ; end of command line
 T_NUM:        equ           255
 T_ASCII:      equ           254
@@ -489,6 +499,9 @@ mainent:
               mov           rf,buffer            ; convert to uppercase
               call          touc
               call          tknizer
+#ifdef USE_CBUFFER
+              mov           rb,cbuffer
+#else              
               ldi           low freemem          ; set R9 to free memory
               plo           r9
               lda           r9                   ; get free memory pointer
@@ -502,6 +515,7 @@ mainent:
               lsnz                               ; don't do next two increments if mid colon def
               inc           rb
               inc           rb
+#endif              
               call          exec
               lbr           mainlp               ; return to beginning of main loop
 crlfout:
@@ -883,7 +897,11 @@ divno:        ghi           r7                   ; get hi of divisor
 ; *** Setup for tokenizer ***
 ; ***************************
 tknizer:      mov           rb, buffer
-tknizerb:     ldi           low freemem          ; set R9 to free memory
+tknizerb:
+#ifdef USE_CBUFFER
+              mov           rf,cbuffer
+#else              
+              ldi           low freemem          ; set R9 to free memory
               plo           r9
               lda           r9                   ; get free memory pointer
               phi           rf                   ; place into rF
@@ -897,6 +915,7 @@ tknizerb:     ldi           low freemem          ; set R9 to free memory
               lsnz
               inc           rf
               inc           rf
+#endif
 ; ******************************
 ; *** Now the tokenizer loop ***
 ; ******************************
@@ -945,7 +964,7 @@ tkcompck:
               lbdf           copycmdtk           ; will handle ." but needs a space after: db FDOTQT,20h,T_ASCII,'foo"',...
               dec           rb
               ldn           rb
-#endif              
+#endif
               smi           '\'                  ; possible comment
               bnz           noncom
               inc           rb
@@ -974,7 +993,7 @@ tokloop:      ldn           r7                   ; get byte from token table
               str           r2                   ; store to stack
               ldn           rb                   ; get byte from buffer
               sm                                 ; do bytes match?
-              bnz           toknomtch            ; jump if no match
+              lbnz           toknomtch            ; jump if no match
               inc           r7                   ; incrment token pointer
               inc           rb                   ; increment buffer pointer
               lbr            tokloop              ; and keep looking
@@ -1010,9 +1029,25 @@ cmdend:       ldn           r7                   ; get byte fro token
 ; *************************************************************
               glo           r8                   ; get command number
               ori           128                  ; set high bit            
-copycmdtk:
+copycmdtk:    plo           r8                   ; redundant UNLESS we jump to copycmdtk from elsewhere
+              smi          FOPAREN
+              bnz          tksto
+tkcomloop:              
+              lda          rb
+              smi          (' '+1)
+              bdf          tkcomloop             ; must be <space>)<space> to close
+              lda          rb                    
+              sdi          ')'
+              bnz          tkcomloop
+              lda          rb
+              smi           (' '+1)              ; check for whitespace
+              bdf          tkcomloop             
+              lbr          tokenlp
+tksto:      
+              glo           r8          
               str           rf                   ; write to command buffer
-              plo           r8                   ; redundant UNLESS we jump to copycmdtk from elsewhere
+              
+#ifndef USE_CBUFFER
               smi           FSEMI
               bz            copycmdpl3           ; need to save 3 extra bytes for this token
               glo           r8
@@ -1023,6 +1058,7 @@ copycmdpl3:
               inc           rf
               inc           rf
               inc           rf                   ; point to next position
+#endif              
 copycmdckq:
               inc           rf
               glo           r8
@@ -2011,7 +2047,69 @@ ccexcl:       call          pop
               call          pop                  ; date data word from stack
               lbdf          error                ; jump on error
               br            goodexcl
-cvariable:    mov           ra,r2
+cvariable:    
+#idef USE_CBUFFER
+; easier.. we just copy the FVARIABLE FASCII String and then bump up two bytes and go
+              mov           ra,r2
+              inc           ra                   ; point to R[6]
+              lda           ra                   ; and retrieve it
+              phi           rb
+              ldn           ra
+              plo           rb                   ; RB=Pointer to input bytestream
+              ldn           rb                   ; get next byte
+              smi           T_ASCII              ; it must be an ascii mark
+              lbnz          error                ; jump if not
+              dec           rb                   ; point back to FVARIABLE
+              ldi           low freemem          ; set R9 to free memory
+              plo           r9
+              lda           r9                   ; get current pointer
+              phi           r7                   ; place here
+              ldn           r9                   ; get low byte
+              plo           r7                   ; R7=start of variable
+              inc           r7
+              inc           r7                   ; make room for link
+cvarlp: 
+              lda           rb                   ; copy from cbuffer to working memory
+              str           r7
+              inc           r7
+              bnz           cvarlp
+              push          rb                   ; RB (on stack)= next input token
+                                                 ; R7 = area for variable
+              ldi           0 
+              str           r7                   ; make sure variable is set to zero (extra feature!)
+              inc           r7                   
+              str           r7
+              inc           r7                   ; R7 now new free pointer
+
+              
+              ldn           r9                   ; R9 = low byte of freemem
+              plo           rf
+              dec           r9
+              ldn           r9
+              phi          rf
+              dec           r9
+              ghi           r7                  ; get memory pointer
+              str           rf       
+              str           r9
+              inc           r9
+              inc           rf           
+              glo           r7
+              str           rf
+              str           r9
+
+              ldi           0                    ; need zero at end of list
+              str           r7                   ; store it
+              inc           r7
+              str           r7
+              pop           rb
+              glo           rb                   ; write back to instruction pointer
+              str           ra
+              dec           ra
+              ghi           rb
+              str           ra
+              lbr           good                 ; return
+#else
+              mov           ra,r2
               inc           ra                   ; point to R[6]
               lda           ra                   ; and retrieve it
               phi           rb
@@ -2087,7 +2185,143 @@ varlp1:       ldn           rb                   ; get byte
               ghi           rb
               str           ra
               lbr           good                 ; return
-ccolon:       mov           ra,r2
+#endif              
+ccolon:
+#ifdef USE_CBUFFER
+; almost the same excep we copy cbuffer to free mem and we have to update within cbuffer not within
+              mov           ra,r2
+              inc           ra                   ; point to R[6]
+              lda           ra                   ; and retrieve it
+              phi           rb
+              ldn           ra
+              plo           rb
+; we have to copy from CBUFFER to  either FSEMI or T_EOS
+              ldi          low freemem
+              plo          r9
+              lda          r9
+              phi          rf
+              ldn          r9
+              plo          rf
+              ldi          low jump
+              plo          r9
+              ldn          r9
+              xri          0c0h
+              bnz          ccmulti               ; don't skip link for lines 2-n, only line 1
+              inc          rf                    ; skip link
+              inc          rf
+              dec          rb                    ; point back at FCOLON
+ccmulti:              
+              push         rf                    ; we will pop back to RB
+
+              
+ccolcpy:      lda          rb
+              str          rf
+              inc          rf
+              plo          re                     ; hold temp
+              smi          FSEMI
+              lbz           ccolcpydn
+              glo          re
+              smi          T_EOS
+              lbnz          ccolcpy
+ccolcpydn:    
+              glo          rb
+              str          ra
+              dec          ra
+              ghi          rb
+              str          ra       ; set up exec to go after the semi or whatever
+              pop          rb       ; this was RF but now points to free mem area
+              inc          rb       ; skip FCOLON
+; after that it is almost normal 
+              ldi           low jump             ; we use this as a flag for multiline ops
+              plo           r9
+              lda           r9
+              xri           0c0h
+              lbnz           colonlp1             ; multiline, just keep it going
+ ; if first line, assume it MIGHT be multline
+              dec           rb                    ; go back after all
+              dec           rb
+              dec           rb
+              glo           rb
+              str           r9
+              inc           r9
+              ghi           rb                   ; yes this is backward for "historical" reasons
+              str           r9
+              inc           rb
+              inc           rb
+              inc           rb                   ; put it back
+
+              ldn           rb                   ; get next byte
+              smi           T_ASCII              ; it must be an ascii mark
+              lbnz          error                ; jump if not
+              inc           rb                   ; move into string
+colonlp1:                                        ; here for both cases
+              ldn           rb
+              smi           T_EOS
+              lbz           colonmark
+              lda           rb
+              smi           FSEMI                ; look for the ;
+              lbnz           colonlp1             ; jump if terminator not found
+              ldi           0                    ; want a command terminator
+              str           rb                   ; write it
+              inc           rb                   ; new value for freemem
+              ldi           low jump
+              plo           r9
+              ldn           r9
+              xri           0C0h
+              bz           colonpreline         ; single line
+; end of multiline
+              ldi           02
+              str           r9                  ; end of multi marker ([JUMP]==2)
+              inc           r9
+              lda           r9
+              stxd
+              ldn           r9
+              str           r2
+              ldi           low freemem
+              plo           r9
+              lda           r2
+              str           r9
+              inc           r9
+              ldn           r2
+              str           r9
+; now the freemem is back to the beginning of the multiline (or we jumped here on a single line)
+colonpreline:
+              ldi           low freemem          ; set R9 to free memory
+              plo           r9
+              lda           r9                   ; get current pointer
+              phi           r7                   ; place here
+              ldn           r9                   ; get low byte
+              plo           r7
+              ghi           rb                   ; get memory pointer
+              str           r7                   ; and store into link list
+              inc           r7
+              glo           rb
+              str           r7
+ccolonpmult:                                     ; come here to only update freemem
+              glo           rb                   ; store new freemem value
+              str           r9
+              dec           r9
+              ghi           rb
+              str           r9
+              ldi           low jump
+              plo           r9
+              ldn           r9
+              xri           1
+              bz            colonnend
+              ldi           0                    ; need zero at end of list (only if finished)
+              str           rb                   ; store it
+              inc           rb
+              str           rb
+colonnend:
+;           ldi     low jump    ; already loaded!
+;           plo     r9
+              ldn           r9
+              xri           2                    ; end of multiline
+              bnz           csemi
+              ldi           0c0h
+              str           r9                   ; mark back to normal
+#else
+              mov           ra,r2
               inc           ra                   ; point to R[6]
               lda           ra                   ; and retrieve it
               phi           rb
@@ -2178,6 +2412,7 @@ colonnend:
               bnz           csemi
               ldi           0c0h
               str           r9                   ; mark back to normal
+#endif              
 cthen:
 csemi:
               lbr           good                 ; return
@@ -2194,6 +2429,7 @@ colonmark:
               bnz           colonmcont           ; already marked
               ldi           1
               str           r9
+#ifndef USE_CBUFFER              
               inc           r9
               ldn           ra                   ; low part
               smi           3                    ; point back to very start
@@ -2203,6 +2439,7 @@ colonmark:
               lda           ra
               smbi          0
               str           r9
+#endif              
 colonmcont:
               ldi           low freemem+1
               plo           r9                   ; set up for main code
@@ -2411,17 +2648,17 @@ cseefunc:     call          dispf
 seefunclp:    call          dispsp
 seefunclpns:
               ldn           r7                   ; get next token
-              bz            seeexit              ; jump if done
+              lbz            seeexit              ; jump if done
               smi           T_ASCII              ; check for ascii
-              bnz           seenota              ; jump if not ascii
+              lbnz           seenota              ; jump if not ascii
               inc           r7                   ; move into string
 seestrlp:     ldn           r7                   ; get next byte
-              bz            seenext              ; jump if done with token
+              lbz            seenext              ; jump if done with token
               call          disp
               inc           r7                   ; point to next character
-              br            seestrlp             ; and continue til done
+              lbr            seestrlp             ; and continue til done
 seenext:      inc           r7                   ; point to next token
-              br            seefunclp
+              lbr            seefunclp
 seenota:      ldn           r7                   ; reget token
               smi           T_NUM                ; is it a number
               lbnz           seenotn              ; jump if not a number
@@ -3034,7 +3271,7 @@ clshift:      call          pop
               lbdf          error                ; jump if stack was empty
               mov           r8,rb                ; value to shift left
               glo           r7                   ; zero shift is identity
-              bz            lshiftret
+              lbz            lshiftret
 ; fall through
 lshiftlp:     glo           r8
               shl                                ; shift lo byte
@@ -3044,7 +3281,7 @@ lshiftlp:     glo           r8
               phi           r8
               dec           r7
               glo           r7
-              bnz           lshiftlp
+              lbnz           lshiftlp
 lshiftret:    mov           rb,r8
               lbr           goodpush
 crshift:      call          pop
@@ -3131,15 +3368,13 @@ bloadlp:      lda           rf
 
 #ifdef BLOAD_TEXT
 cbload:       mov           rb,loadtext
-              br            cbload2
-cbload1:      pop           rb
-              inc           rb 
 cbload2:      ldn           rb
               lbz           mainlp
               ;call          dispf
               ;db '.'  ; Just for debugging print a dot for each line loaded
               call          tknizerb
               push          rb
+#ifndef USE_CBUFFER
               ldi           low freemem
               plo           r9
               lda           r9
@@ -3148,8 +3383,13 @@ cbload2:      ldn           rb
               plo           rb
               inc           rb
               inc           rb
+#else
+              mov           rb,cbuffer
+#endif                            
               call          exec
-              br            cbload1  
+              pop           rb
+              inc           rb
+              br            cbload2
 
 #endif
 
@@ -3335,7 +3575,7 @@ touc:         ldn           rf                   ; check for quote
               ldn           rf                   ; get byte from string
               lbz            touc_dn              ; jump if done
               smi           'a'                  ; check if below lc
-              bnf           touc_nxt             ; jump if so
+              lbnf           touc_nxt             ; jump if so
               smi           27                   ; check upper rage
               bdf           touc_nxt             ; jump if above lc
               ldn           rf                   ; otherwise convert character to lc
@@ -3449,7 +3689,7 @@ inkey:        ldi           015h                 ; need UART line status registe
               dec           r2                   ; correct for inc on out
               inp           UART_DATA            ; read line status register
               ani           1                    ; mask for data ready bit
-              bz            nokey                ; return if no bytes to read
+              lbz            nokey                ; return if no bytes to read
               ldi           010h                 ; select data register
               str           r2                   ; prepare for out
               out           UART_SELECT          ; write to register select port
@@ -3613,6 +3853,7 @@ cmdtable:     db            'WHIL',('E'+80h)
               db            'ENDI',('F'+80h)
               db            'RSEE',('D'+80h)
               db            'RP',('@'+80h)
+              db            ('('+80h)
               db            0                    ; no more tokens
 cmdvecs:      dw            cwhile               ; 81h
               dw            crepeat              ; 82h
@@ -3698,6 +3939,9 @@ cmdvecs:      dw            cwhile               ; 81h
               dw            cthen                ; alias ENDIF=then (as in gforth)
               dw            crseed
               dw            crpat
+              dw            0
+
+
 #ifdef        STGROM
 #define       EBLOCK 
 #define       STGROMBLOAD  
