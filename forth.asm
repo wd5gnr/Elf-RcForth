@@ -2880,6 +2880,58 @@ allotpop7:
               lbr           good
               ; end of bad experimental code
 #endif
+#ifdef USE_CBUFFER
+; very simple. Make sure we are in a good place and adjust the here pointer
+callot:       mov           r7,storage
+callotlp1:    lda           r7                   ; get next link
+              phi           r8
+              ldn           r7
+              plo           r8
+              lda           r8                   ; get value at that link
+              phi           rb
+              ldn           r8
+              dec           r8                   ; keep r8 pointing at link
+              bnz           callotno             ; jump if next link is not zero
+              ghi           rb                   ; check high byte
+              bnz           callotno             ; jump if not zero
+              br            callotyes
+callotno:     mov           r7,r8                ; r7=link
+              br            callotlp1            ; and keep looking
+callotyes:    inc           r7                   ; point to type byte
+              ldn           r7                   ; get it
+              smi           FVARIABLE            ; it must be a variable
+              lbnz          error                ; jump if not
+              call          pop
+              lbdf          error                ; jump if error
+; here R8 points to the zero and R7 points to the FVARIABLE. RB has the amount to adjust
+              dec          r7           ; point to low part
+
+              ldi          low freemem+1
+              plo          r9
+              glo          rb
+              str          r2
+              glo          r8
+              add
+              str          r9
+              str          r7
+              plo          rf
+              dec          r9
+              dec          r7
+              ghi          rb
+              str          r2
+              ghi          r8
+              adc
+              str          r9
+              str          r7
+              phi          rf
+              ldi          0
+              str          rf
+              inc          rf
+              str          rf
+              lbr          good
+
+
+#else
 ; this is the code we use isntead of the above
 callot:       mov           r7,storage
 callotlp1:    lda           r7                   ; get next link
@@ -2930,7 +2982,7 @@ callotyes:    inc           r7                   ; point to type byte
               inc           r8
               str           r8
               lbr           good
-
+#endif
 
 cmul:         call          pop
               lbdf          error                ; jump on error
