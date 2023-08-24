@@ -736,7 +736,7 @@ mulcont:      ghi           r7                   ; shift multiplier
               glo           r7
               shrc
               plo           r7
-              lbnf           mulcont2             ; loop if no addition needed
+              bnf           mulcont2             ; loop if no addition needed
               glo           rb                   ; add 6 to 8
               str           r2
               glo           r8
@@ -1005,7 +1005,7 @@ nomtch1:      ldn           r7                   ; get byte from token
               ani           128                  ; looking for last byte of token
               bnz           nomtch2              ; jump if found
               inc           r7                   ; point to next byte
-              lbr            nomtch1              ; and keep looking
+              br            nomtch1              ; and keep looking
 nomtch2:      inc           r7                   ; point to next token
               inc           r8                   ; increment command number
               ldn           r7                   ; get next token byte
@@ -1019,11 +1019,11 @@ cmdend:       ldn           r7                   ; get byte fro token
               str           r2                   ; save to stack
               ldn           rb                   ; get byte from buffer
               sm                                 ; do they match
-              lbnz           toknomtch            ; jump if not
+              bnz           toknomtch            ; jump if not
               inc           rb                   ; point to next byte
               ldn           rb                   ; get it
               smi           (' '+1)              ; it must be whitespace
-              lbdf           toknomtch            ; otherwise no match
+              bdf           toknomtch            ; otherwise no match
 ; *************************************************************
 ; *** Match found, store command number into command buffer ***
 ; *************************************************************
@@ -1183,7 +1183,7 @@ numberlp:     ghi           r7                   ; copy number to temp (don't us
 numbererr:    mov           rb,rc                ; recover address
               lbr           nonnumber
 numberdn:     glo           re                   ; get negative flag
-              lbz            numberdn1            ; jump if positive number
+              bz            numberdn1            ; jump if positive number
               ghi           r7                   ; negative, so 2s compliment number
               xri           0ffh
               phi           r7
@@ -1218,7 +1218,7 @@ tohexlp:      ldn           rb                   ; get next byte
               lbnf           nonnumber            ; jump if non-numeric
               ldn           rb                   ; recover byte
               smi           '9'+1                ; upper range of digits
-              lbnf           tohexd               ; jump if digit
+              bnf           tohexd               ; jump if digit
               ldn           rb                   ; recover character
               smi           'A'                  ; check below uc A
               bnf           nonnumber            ; jump if not hex character
@@ -1254,7 +1254,7 @@ tohexal:      glo           r7
               ; embedded non hex characters get filtered out here
               ldn           rb
               call          ishex                ; check for hex character
-              lbdf           tohexlp              ; loop back if so else
+              bdf           tohexlp              ; loop back if so else
               ; we dont have a hex char
               ; we got here since this was not a valid hex number
 nothexnum:    mov           rb,rc                ; retrieve pointer
@@ -1668,12 +1668,12 @@ cunerr:       lbdf          error                ; jump if stack was empty
               str           r2
               glo           rb
               xor
-              lbnz           unequal              ; jump if not equal
+              bnz           unequal              ; jump if not equal
               ghi           r7
               str           r2
               ghi           rb
               xor
-              lbnz           unequal              ; jump if not equal
+              bnz           unequal              ; jump if not equal
               plo           rb
               lbr           goodpushb
 unequal:      ldi           0                    ; set return result
@@ -1730,7 +1730,7 @@ culess:       call          pop
               str           r2
               ghi           r7
               sdb                                ; subtract with borrow
-              lbr            gooddf
+              br            gooddf
 cwords:       mov           r7, cmdtable
               ldi           0
               phi           rd
@@ -2339,7 +2339,7 @@ colonnend:
 colonlp1:                                        ; lda     rb                  ; get byte
               ldn           rb
               smi           T_EOS
-              lbz           colonmark
+              bz           colonmark
               lda           rb
               smi           FSEMI                ; look for the ;
               lbnz           colonlp1             ; jump if terminator not found
@@ -2504,7 +2504,7 @@ csee_sub:
               plo           rf
               ldn           r7                   ; get type byte
               smi           86h                  ; check for variable
-              lbnz          cseefunc             ; jump if not
+              bnz          cseefunc             ; jump if not
               call          f_inmsg
               db            'VARIABLE ',0
               inc           r7                   ; skip variable mark
@@ -2512,9 +2512,9 @@ csee_sub:
 seevname:
               inc           r7                   ; point to name
               ldn           r7
-              lbz            seeveq
+              bz            seeveq
               call          disp
-              lbr            seevname
+              br            seevname
 seeveq:
               call          crlfout
               ;  need to see if we need an allot here
@@ -2688,11 +2688,11 @@ seenotnlp:    dec           r8                   ; decrement count
               lbz            seetoken             ; found the token
 seelp3:       lda           rb                   ; get byte from token
               ani           128                  ; was it last one?
-              lbnz           seenotnlp            ; jump if it was
-              lbr            seelp3               ; keep looking
+              bnz           seenotnlp            ; jump if it was
+              br            seelp3               ; keep looking
 seetoken:     ldn           rb                   ; get byte from token
               ani           128                  ; is it last
-              lbnz           seetklast            ; jump if so
+              bnz           seetklast            ; jump if so
               ldn           rb                   ; retrieve byte
               call          disp
               inc           rb                   ; point to next character
@@ -2991,7 +2991,7 @@ forgetlp1:    lda           rb                   ; get pointer
               ldn           rb
               plo           ra
               or                                 ; see if it was zero
-              lbz            forgetd1             ; jump if it was
+              bz            forgetd1             ; jump if it was
               glo           rc                   ; subtract RC from RA
               str           r2
               glo           ra
@@ -3004,7 +3004,7 @@ forgetlp1:    lda           rb                   ; get pointer
               smb
               str           rb
               mov           rb,ra
-              lbr            forgetlp1            ; loop until done
+              br            forgetlp1            ; loop until done
 forgetd1:     lda           r7                   ; get next entry
               phi           rb
               ldn           r7
@@ -3151,7 +3151,7 @@ addat:
               adc
               lbr           goodpushb
 crpat:        mov           r8,rstack   
-              lbr            addat           
+              br            addat           
 ; -----------------------------------------------------------------
 ; additions April 2022  GDJ
 ; -----------------------------------------------------------------
@@ -3206,7 +3206,7 @@ cmovestr:     ldn           r7
               str           r8
               dec           r8
               dec           rc
-              lbr            cmovelp
+              br            cmovelp
 csetq:        call          pop
               lbdf          error                ; jump if error
               glo           rb                   ; get low of return value
@@ -3281,7 +3281,7 @@ lshiftlp:     glo           r8
               phi           r8
               dec           r7
               glo           r7
-              lbnz           lshiftlp
+              bnz           lshiftlp
 lshiftret:    mov           rb,r8
               lbr           goodpush
 crshift:      call          pop
@@ -3571,24 +3571,24 @@ setupfd:      mov           rd, fildes
 ; **********************************************************
 touc:         ldn           rf                   ; check for quote
               smi           022h
-              lbz            touc_qt              ; jump if quote
+              bz            touc_qt              ; jump if quote
               ldn           rf                   ; get byte from string
-              lbz            touc_dn              ; jump if done
+              bz            touc_dn              ; jump if done
               smi           'a'                  ; check if below lc
-              lbnf           touc_nxt             ; jump if so
+              bnf           touc_nxt             ; jump if so
               smi           27                   ; check upper rage
               bdf           touc_nxt             ; jump if above lc
               ldn           rf                   ; otherwise convert character to lc
               smi           32
               str           rf
 touc_nxt:     inc           rf                   ; point to next character
-              lbr            touc                 ; loop to check rest of string
+              br            touc                 ; loop to check rest of string
 touc_dn:      rtn                                ; return to caller
 touc_qt:      inc           rf                   ; move past quote
 touc_qlp:     lda           rf                   ; get next character
               bz            touc_dn              ; exit if terminator found
               smi           022h                 ; check for quote charater
-              lbz            touc                 ; back to main loop if quote
+              bz            touc                 ; back to main loop if quote
               br            touc_qlp             ; otherwise keep looking
 ; [GDJ] type out number according to selected BASE and signed/unsigned flag
 typenumind:
@@ -3646,9 +3646,9 @@ nospace:
 ; *************************************
 isnum:        plo           re                   ; save a copy
               smi           '0'                  ; check for below zero
-              lbnf           fails                ; jump if below
+              bnf           fails                ; jump if below
               smi           10                   ; see if above
-              lbdf           fails                ; fails if so
+              bdf           fails                ; fails if so
 passes:       smi           0                    ; signal success
               lskp
 fails:        adi           0                    ; signal failure
@@ -3663,17 +3663,17 @@ err:          smi           0                    ; signal an error
 ; **********************************
 ishex:        call          isnum
               plo           re                   ; keep a copy
-              lbdf           passes               ; jump if it is numeric
+              bdf           passes               ; jump if it is numeric
               smi           'A'                  ; check for below uppercase a
-              lbnf           fails                ; value is not hex
+              bnf           fails                ; value is not hex
               smi           6                    ; check for less then 'G'
-              lbnf           passes               ; jump if so
+              bnf           passes               ; jump if so
               glo           re                   ; recover value
               smi           'a'                  ; check for lowercase a
-              lbnf           fails                ; jump if not
+              bnf           fails                ; jump if not
               smi           6                    ; check for less than 'g'
-              lbnf           passes               ; jump if so
-              lbr            fails
+              bnf           passes               ; jump if so
+              br            fails
               ; clear tos, himem & rstack blocks
               
 ;--------------------------------------------------------------
