@@ -18,7 +18,7 @@
   db ': > SWAP < ;',0
   db ': >= < NOT ;',0
   db ': <= > NOT ;',0
-  db ': , 2 ALLOT SWAP DUP ROT SWAP ! 2+ ;',0
+  db ': , HERE 2 ALLOT 2- ! ;',0
   db ': 0< 0 < ;',0
   db ': 0> 0 > ;',0
   db ': 0= 0 = ;',0
@@ -37,7 +37,7 @@
   db ': BYTESWAP DUP 8 >> SWAP 0XFF AND 8 << OR ;',0
   db ': C+! DUP >R C@ + R> C! ;',0
   db ': C-! DUP >R C@ SWAP - R> C! ;',0
-  db ': C, 1 ALLOT SWAP DUP ROT SWAP C! 1+ ;',0
+  db ': C, HERE 1 ALLOT 1- C! ;',0
   db ': CELLS 2 * ;',0
   db ': CLEAR DEPTH WHILE DROP DEPTH REPEAT ;',0
   db ': CLRBIT 1 SWAP << INVERT AND ;',0
@@ -112,7 +112,7 @@
   db FCOLON,'> ',FSWAP,FLESS,FSEMI,0
   db FCOLON,'>= < NOT ',FSEMI,0
   db FCOLON,'<= > NOT ',FSEMI,0
-  db FCOLON,', 2 ',FALLOT,FSWAP,FDUP,FROT,FSWAP,FEXCL,'2+ ',FSEMI,0
+  db FCOLON,', ',FHERE,'2 ',FALLOT,'2- ',FEXCL,FSEMI,0
   db FCOLON,'0< 0 < ',FSEMI,0
   db FCOLON,'0> 0 > ',FSEMI,0
   db FCOLON,'0= 0 = ',FSEMI,0
@@ -131,7 +131,7 @@
   db FCOLON,'BYTESWAP ',FDUP,'8 >> ',FSWAP,'0XFF ',FAND,'8 << ',FOR,FSEMI,0
   db FCOLON,'C+! ',FDUP,FGTR,FCAT,FPLUS,FRGT,FCEXCL,FSEMI,0
   db FCOLON,'C-! NEG C+! ',FSEMI,0
-  db FCOLON,'C, 1 ',FALLOT,FSWAP,FDUP,FROT,FSWAP,'C! 1+ ',FSEMI,0
+  db FCOLON,'C, ',FHERE,'1 ',FALLOT,'1- ',FCEXCL,FSEMI,0
   db FCOLON,'CELLS 2* ',FSEMI,0
   db FCOLON,'CLEAR ',FDEPTH,FWHILE,FDROP,FDEPTH,FREPEAT,FSEMI,0
   db FCOLON,'CLRBIT 1 ',FSWAP,' << INVERT ',FAND,FSEMI,0

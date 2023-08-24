@@ -15,6 +15,22 @@ What's new
 Verson 0.4 
 
 
+I have had to back away from the "safe" ALLOT since this is more complex than it appears. 
+The issue is if you have something like:
+
+VARIABLE TRACKER 100 ALLOT TRACKER 100 ERASE ." Tracking array ready" CR 
+
+The ERASE will zero out 100 bytes including the rest of your command line.
+
+It should be OK, however, to say:
+
+VARIABLE TRACKER 100 ALLOT
+TRACKER 100 ERASE ." Tracking array ready" CR
+
+The , and C, words now work more like you think they should since the restrictions on variable lines is gone
+
+###
+
 You can now include things after a colon definition, a variable, and allot is now safer.
 So you can now say:
 
@@ -291,8 +307,8 @@ J        ( -- j )                   - Get loop counter from outer loop
 TYPE     (addr n -- )               - Display n bytes at addr
 DUMP     (addr n -- )               - Display n bytes at addr as 16 byte records
 CELLS    (n -- 2n)                  - Converts array index into byte offset
-,        (a d -- a+2)               - Use after array definition; see notes
-c,       (a b -- a+1)               - Use after array definition; see notes
+,        (d -- )                    - Use after array definition; see notes
+c,       (b -- )                    - Use after array definition; see notes
 BASEOUT  (n b --)                   - Output number n in base b (preserves BASE)
 #.       (n -- )                    - Output number n in decimal regardless of BASE
 $.       (n -- )                    - Output number n in hex regardless of BASE
@@ -372,7 +388,7 @@ Does NOT do what you think it does. End the line after the foo.
 (No longer true; this now works)
 
 You also need to be careful with allot... 
-(No longer true. Allot is now "safe") 
+I briefly tried to make it safe, but it is trickier than it appears
 
 You can also add things after a colon definition safely.
 
@@ -392,6 +408,9 @@ Just after the ALLOT your memory now looks like:
 So now, when FILL executes, it is going to wipe out your command line, so 10 2 + . is going to disappear.
 In this case, the zero gracefully ends it, but in other cases, not so much!
 
+As long as your input stream stays "ahead" of the changes, you should be OK but be careful.
+
+
 XXXX
 
 SEE emits all integers as unsigned with 0x or 0# prefixes to faciliate reloading correctly
@@ -409,16 +428,21 @@ However, they do work with output. So a possible definition is:
 
 XXXX
 
-To create an array, you can use the comma or c, operators. However, unlike
-normal Forth, you must do it on a second line. Suppose you want to create an 
-array with 1, 2, 3 in it:
+To create an array, you can use the comma or c, operators. This has changed recently to be more like normal Forth.
 
-VARIABLE numbers
-number 1 , 2 , 3 ,
+VARIABLE MYARRAY 1 , 2 , 3 , 4 ,
 
-Note that the last comma actually allocates one more location. You could use swap ! instead.
+Note the spaces around the commas and that there is one at the end which will create one extra cell.
 
-The c, is similar but allocates an extra byte
+SEE MYARRAY
+VARIABLE MYARRAY
+0x08 ALLOT
+0x01 MYARRAY 0x00 + !
+0x02 MYARRAY 0x02 + !
+0x03 MYARRAY 0x04 + !
+0x04 MYARRAY 0x06 + !
+0x00 MYARRAY 0x08 + !
+
 
 You can also use ALLOT but this is now in bytes not words. Use CELLS or just multiply by 2:
 
@@ -433,6 +457,9 @@ VARIABLE PGM
 PGM 0x7A c, 0x7B c, 0xD5 CSTORE
 
 Previous code that used word-sized ALLOT will break
+
+See the notes above about how ALLOT can cause you to overwrite the current command line. When in doubt, do the ALLOT 
+on its own line and then start a new line.
 
 XXX
 

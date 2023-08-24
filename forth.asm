@@ -2502,6 +2502,8 @@ ckeyq:
               call          inkey
               glo           r7
               lbr           goodpushb0
+; see note below about this aborted attempt to improve callot
+#ifdef OLD_CODE_BAD_IDEA           
 callot:       mov           r7,storage
 callotlp1:    lda           r7                   ; get next link
               phi           r8
@@ -2523,19 +2525,27 @@ callotyes:    inc           r7                   ; point to type byte
               lbnz          error                ; jump if not
               call          pop
               lbdf          error                ; jump if error
-#ifdef        ALLOT_WORDS                        ; note: enable this and you break see/list
+;;#ifdef        ALLOT_WORDS                        ; note: enable this and you break see/list
               glo           rb                   ; multiply by 2
               shl
               plo           rb
               ghi           rb
               shlc
               phi           rb
-#endif
+;;#endif
+
+; while the below is true, it is also more complicated. If ALLOT appears inside a word
+; then you are hosed, because you need to move this still, but you have no way to find it
+; an arbitrary number of levels away.
+; So, for now, at least, I think I am just going to declare ALLOT as risky which is no worse than it was before.
+
 ; The problem here is that if you have something like 10 ALLOT <other stuff> is that if the "other stuff" fills in 
 ; those 10 cells it will start to wipe out your parsed input line.
 ; So... we know eosptr and where we are (the value on the stack) plus the # of bytes (RB)
 ; So... we need to copy # of bytes backward from now to where we will be later
 ; We need to do this now before the free pointer gets updated and don't forget to update the eosptr
+; HOWEVER if we have allot inside a word, the instruction pointer may be < here at which point
+; forget it
 
               mov           ra,r2               ; the top item on the stack is 
               push          r7                  ; our current position in the bytecode stream
@@ -2543,7 +2553,22 @@ callotyes:    inc           r7                   ; point to type byte
               lda           ra
               phi           r7
               ldn           ra
-              plo           r7                  ; source copy to save input line in R7 (but we saved old R7)
+              plo           r7   
+              ; if r7<r8 then we don't need to do jack but pop r7 and go
+              ghi           r8
+              str           r2
+              ghi           r7
+              sd
+              bz            allheretest
+              bdf           allotpop7
+allheretest:  glo           r8       
+              str           r2
+              glo           r7
+              sdb
+              bdf           allotpop7       
+; ok we gotta move
+
+                                ; source copy to save input line in R7 (but we saved old R7)
               glo           rb  ; old except *  ; r8 is the top of free space, we add that to the total count
               str           r2                  ; however, the pointer will be used, too, so we can -2 from the count
               glo           r8                  
@@ -2593,9 +2618,10 @@ callotyes:    inc           r7                   ; point to type byte
               call          cmover
               pop           r8
               pop           rc
+allotpop7:              
               pop           r7
 ; as you were           
-       
+    
               dec           r7                   ; point back to link
               glo           r8                   ; and write new pointer
               str           r7
@@ -2614,6 +2640,60 @@ callotyes:    inc           r7                   ; point to type byte
               inc           r8
               str           r8
               lbr           good
+              ; end of bad experimental code
+#endif
+; this is the code we use isntead of the above
+callot:       mov           r7,storage
+callotlp1:    lda           r7                   ; get next link
+              phi           r8
+              ldn           r7
+              plo           r8
+              lda           r8                   ; get value at that link
+              phi           rb
+              ldn           r8
+              dec           r8                   ; keep r8 pointing at link
+              bnz           callotno             ; jump if next link is not zero
+              ghi           rb                   ; check high byte
+              bnz           callotno             ; jump if not zero
+              br            callotyes
+callotno:     mov           r7,r8                ; r7=link
+              br            callotlp1            ; and keep looking
+callotyes:    inc           r7                   ; point to type byte
+              ldn           r7                   ; get it
+              smi           FVARIABLE            ; it must be a variable
+              lbnz          error                ; jump if not
+              call          pop
+              lbdf          error                ; jump if error
+              glo           rb                   ; add rb to r8
+              str           r2
+              glo           r8
+              add
+              plo           r8
+              ghi           rb
+              str           r2
+              ghi           r8
+              adc
+              phi           r8
+              dec           r7                   ; point back to link
+              glo           r8                   ; and write new pointer
+              str           r7
+              dec           r7
+              ghi           r8
+              str           r7
+              ldi           low freemem          ; need to adjust free memory pointer
+              plo           r9                   ; put into data frame
+              ghi           r8                   ; and save new memory position
+              str           r9
+              inc           r9
+              glo           r8
+              str           r9
+              ldi           0                    ; zero new position
+              str           r8
+              inc           r8
+              str           r8
+              lbr           good
+
+
 cmul:         call          pop
               lbdf          error                ; jump on error
               mov           r7,rb
@@ -2834,7 +2914,7 @@ addat:
               adc
               lbr           goodpushb
 crpat:        mov           r8,rstack   
-              br            addat           
+              lbr            addat           
 ; -----------------------------------------------------------------
 ; additions April 2022  GDJ
 ; -----------------------------------------------------------------
