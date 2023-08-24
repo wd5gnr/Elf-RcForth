@@ -2006,7 +2006,7 @@ ccat:         call          pop                  ; get address from stack
               br            catcomm
 ccexcl:       call          pop
               lbdf          error                ; jump on error
-              mov           rb,r7
+              mov           r7,rb
               call          pop                  ; date data word from stack
               lbdf          error                ; jump on error
               br            goodexcl
