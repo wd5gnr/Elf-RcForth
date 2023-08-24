@@ -82,6 +82,7 @@
   db ': BASEOUT BASE @ -ROT BASE ! . BASE ! ;',0
   db ': #. 0#10 BASEOUT ;',0
   db ': $. 0X10 BASEOUT ;',0
+  db ': %. 0x8000 BEGIN 2DUP AND IF 0x31 ELSE 0x30 THEN EMIT 1 >> DUP NOT UNTIL SPACE ;',0
   include custom.inc
   db '." Ext words loaded" CR',0
 #else
@@ -177,21 +178,3 @@
 
   db  0
 
-
-; possible new words:
-; RDROP
-; RPICK
-; RDEPTH
-; 2NIP
-; 2TUCK
-; 2ROT
-; 2-ROT
-; sp!
-; rp@
-; rp!
-; arshift
-; ror, rol
-; clz - count leading zeros
-; even - make even
-; 2*
-; 2/

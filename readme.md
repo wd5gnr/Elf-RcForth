@@ -8,11 +8,21 @@ RcForth forth-doc.txt
 By Mike Riley
 
 Previous  update : 24 May 2022  Glenn Jolly
-Last update: 22 Aug 2023 Al Williams
+Last update: 23 Aug 2023 Al Williams
 
 What's new
 ----------
 Verson 0.4 
+
+You can now include things after a colon definition, a variable, and allot is now safer.
+So you can now say:
+
+VARIABLE NCC 1701 ALLOT 0 NCC !
+
+-or-
+: SILLY 2 * . ; 10 SILLY
+
+###
 
 New extended words. OVER bug fixed.
 
@@ -311,10 +321,10 @@ You can store this as is (just put a zero at the end). But you can also do this:
 FCOLON,'makeeven ',FDUP,'1 ',FAND,FIF,'1+ ',FTHEN, FSEMI,0
 
 This includes the end zero. Note that you have to use strings for numbers and non-core words like 1+. You can mix and match as much as you want.
-Do not use T_NUM, T_STR, or FDOTQT when using the tokenized mode. All of the tokens are at the top of the forth.asm file.
+Note that FDOTQT is a bit strange (see the inc file for an example). All of the tokens are at the top of the forth.asm file.
 
 There is a custom.inc file that will be empty on GitHub. You can add your own defs there if you don't want them mixed in with
-the "factory default" words.
+the "factory default" words. There is an empty init word that you can add to, if you like.
 
 XXXX
 
@@ -356,8 +366,12 @@ XXXX
 Nothing is executed after VARIABLE xxx. That means:
 VARIABLE foo 100 allot
 Does NOT do what you think it does. End the line after the foo.
+(No longer true; this now works)
 
 You also need to be careful with allot... 
+(No longer true. Allot is now "safe") 
+
+You can also add things after a colon definition safely.
 
 Suppose you create variable AAA:
 
