@@ -4,7 +4,7 @@
 ; Sometimes (but not always) RC/ASM stops after a double quote
 ; So '." foo " .',0  -- might stop after the quote. Check the listing to be sure
 
-  db '." Wait..." CR',0
+  db '." Wait..."CR',0
 #ifdef NO_TOKEN_COMPRESSION
   db ': +! TUCK @ + SWAP ! ;',0
 ;  db ': -! TUCK @ SWAP - SWAP ! ;',0
@@ -15,7 +15,7 @@
   db ': @+ DUP @ SWAP 2+ SWAP ;',0
   db ': ? @ U. ;',0
   db ': ?DUP DUP IF DUP THEN ;',0
-  db ': .S ." <"" DEPTH .- ." > " DEPTH ?DUP IF DUP 0 DO DUP I - PICK . LOOP DROP THEN ;',0
+  db ': .S ." <" DEPTH .- ." > "DEPTH ?DUP IF DUP 0 DO DUP I - PICK . LOOP DROP THEN ;',0
   db ': > SWAP < ;',0
   db ': >= < NOT ;',0
   db ': <= > NOT ;',0
@@ -47,8 +47,8 @@
 ; not sure why because it works in other places
 ; Also if you embed the escape codes, a see or list will clear the screen here :(
 ;  db ': CLS ." [2J[H" '
-  db ': CLS ESC ." [2J" ESC ." [H"'
-  db ' ;',0
+  db  ': CLS ESC ." [2J"ESC ." [H"'
+  db  ';',0
   db ': DUMP CR 5 SPACES 0#16 0 DO I . LOOP 0 DO CR DUP . 0#16 0 DO DUP C@ . 1+ LOOP DUP 0#16 - 0#16 TYPE 0#16 +LOOP DROP CR ;',0
   db ': ERASE 0 FILL ;',0
   db ': ESC 0X1B EMIT ;',0
@@ -86,7 +86,7 @@
   db ': $. 0X10 BASEOUT ;',0
   db ': %. 0x8000 BEGIN 2DUP AND IF 0x31 ELSE 0x30 THEN EMIT 1 >> DUP NOT UNTIL SPACE ;',0
   include custom.inc
-  db '." Ext words loaded" CR INIT',0
+  db '." Ext words loaded"CR INIT',0
 #else
 ; You can put ASCII definitions/command here just as above
 ; But you can also use the Fxxx words for core words.
@@ -136,8 +136,8 @@
   db FCOLON,'CELLS 2* ',FSEMI,0
   db FCOLON,'CLEAR ',FDEPTH,FWHILE,FDROP,FDEPTH,FREPEAT,FSEMI,0
   db FCOLON,'CLRBIT 1 ',FSWAP,' << INVERT ',FAND,FSEMI,0
-  db FCOLON,'CLS ESC ." [2J" ESC ." [H"'
-  db ' ',FSEMI,0
+  db FCOLON,'CLS ESC ." [2J"ESC ." [H"'
+  db FSEMI,0
   db FCOLON 'DUMP ',FCR,'5 SPACES 0#16 0 ',FDO,FI,FDOT,FLOOP,'0 ',FDO,FCR,FDUP,FDOT,'0#16 0 ',FDO,FDUP,FCAT,FDOT,'1+ ',FLOOP,FDUP,'0#16 - 0#16 TYPE 0#16 ',FPLOOP,FDROP,FCR,FSEMI,0
   db FCOLON,'ERASE 0 FILL ',FSEMI,0
   db FCOLON,'ESC 0X1B ',FEMIT,FSEMI,0
@@ -171,11 +171,12 @@
   db FCOLON,'UMIN 2DUP U> SWAP? ',FDROP,FSEMI,0
   db FCOLON,'UMAX 2DUP U< SWAP? ',FDROP,FSEMI,0
   db FCOLON,'BASEOUT ',FBASE,FAT,FMROT,FBASE,FEXCL,FDOT,FBASE,FEXCL,FSEMI,0
-  db FCOLON,'#. 0#10 BASEOUT ;',0
-  db FCOLON,'$. 0X10 BASEOUT ;',0
-  db FCOLON,'%. 0X8000 BEGIN 2DUP AND IF 0X31 ELSE 0X30 THEN EMIT 1 >> DUP NOT UNTIL SPACE ;',0
+  db FCOLON,'#. ',T_NUM,0,10,'BASEOUT ;',0
+  db FCOLON,'$. ',T_NUM,0,16,'BASEOUT ;',0
+  db FCOLON,'%. ',T_NUM,80h,00,FBEGIN,'2DUP ',FAND,FIF,T_NUM,0,31h,FELSE,T_NUM,0,30h
+  db         FTHEN,FEMIT,'1 ',FGTGT,FDUP,'NOT ',FUNTIL,'SPACE ',FSEMI,0
   include custom.inc
-  db '." Ext words loaded" CR',0
+  db '." Ext words loaded"CR',0
   db 'INIT',0
 #endif
 

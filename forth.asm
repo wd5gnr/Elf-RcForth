@@ -21,6 +21,10 @@
               ; Anything else must be a string, so it gets marked with an FE and terminated with a zero.
               ; The tokenized string is already in the free storage so a VARIABLE or : just bumps up
               ; the pointer to the end of the string (or just past, for a variable)
+              ; Note: This is no longer true if using USE_CBUFFER
+              ; This reserved 256 bytes and your input gets compiled there
+              ; This makes : and VARIABLE and ALLOT easier and safer
+              ; because it isn't trying to overwrite your input
               ;
               ; The colon operator just grabs the name, and copies everything else. So core words
               ; are tokenized, but variables and user words are not.
@@ -46,7 +50,8 @@
               ; VARIABLE can't have anything following it
               ; e.g. VARIABLE X X 0 ! -- does not work (now throws an error)
               ; on a word def is ignored also  (now throws an error)
-              ;
+              ; These no longer throw errors and it ks now allowed
+              ;  
               ; To catch all these we now define T_EOS 0xFD. The tokenizer marks the end of string with it
               ; and most things ignore it. But colon and varible use it to make sure the string is
               ; complete and doesn't have too much stuff in it, also. As an extra feature, we now
@@ -72,7 +77,11 @@
               ; However, if you wanted to put these in the data stream
               ; You'd need to set NO_TOKEN_COMPRESSION to allow that data to pass through
               ; Not sure what the use case for that would be, however.
+              ; NOTE: The BIN format is highly dependent on the memory layout
+              ; If you turn it back on, you will lose many extended words and you may
+              ; have to redo the hex code blocks to work with the current memory layout
 
+; Configuration items
 
 ; pick EXACTLY one of the next three
 ;#define NO_BLOAD
@@ -81,6 +90,8 @@
 
 ; if you want to compile to a separate "compile buffer" define this
 #define USE_CBUFFER
+
+; Set up stuff based on your choices
 
 #ifndef NO_BLOAD
 #define BLOAD_AUTO
@@ -108,7 +119,7 @@
 #define       CODE          06600h
 #define       XMODEM        0ed00h
 #define       RAMBASE       0h
-              ; [gnr] The UART is used in inkey so when using bitbang, no inkey!
+              ; [gnr] The UART is used in inkey so when using bitbang, no working KEY?
 #define       UART_SELECT   6                    ; UART register select I/O port
 #define       UART_DATA     7                    ; UART data I/O port
 ;[RLA] XMODEM entry vectors for the STG EPROM ...
@@ -151,7 +162,7 @@ exitaddr:     equ           08003h
 #ifdef        STGROM
 #define       ANYROM        1
               include       config.inc
-#define       CODE          FORTH                ; [gnr] [GDG] says now bigger than 15 pages
+#define       CODE          FORTH                ; [gnr] [GDG] ~19 pages w/all extended words
 #define       RAMBASE       00000h
               ; [gnr] The UART is used in inkey so when using bitbang, no inkey!
 #define       UART_SELECT   6                    ; UART register select I/O port
@@ -207,8 +218,13 @@ stack:        equ           RAMBASE+01ffh
 ;  R5   - standard ret
 ;  R6   - used by Scall/Sret linkage
 ;  R7   - general and command table pointer
-;  R9   - Data segment
+;  R9   - Data segment (variable access)
+;  RA   - Used to access data in stack frames
 ;  RB   - general SCRT return usage and token stream pointer
+
+; These tokens are the order of the tokens in the tables at the bottom
+; A few are used in the code, but you can use them as compressed tokens
+; in extended.inc and/or custom.inc
 FWHILE:       equ           81h
 FREPEAT:      equ           FWHILE+1
 FIF:          equ           FREPEAT+1
@@ -273,9 +289,9 @@ FBYE:         equ           FLOAD+1
 FSPAT:        equ           FBYE+1
 FDECIMAL:     equ           FSPAT+1
 FHEX:         equ           FDECIMAL+1
-FLT:          equ           FHEX+1
-FGT:          equ           FLT+1
-FDELAY:       equ           FGT+1
+FLTLT:        equ           FHEX+1
+FGTGT:        equ           FLTLT+1
+FDELAY:       equ           FGTGT+1
 FBLOAD:       equ           FDELAY+1
 FGOTOXY:      equ           FBLOAD+1   ; should move to extended
 FRAND:        equ           FGOTOXY+1
@@ -292,10 +308,12 @@ FRPAT:        equ           FRSEED+1
 FOPAREN:      equ           FRPAT+1
 FDOTM:        equ           FOPAREN+1
 FUDOTM:       equ           FDOTM+1
-
+; special tokens
 T_EOS:        equ           253                  ; end of command line
 T_NUM:        equ           255
 T_ASCII:      equ           254
+
+; THIS IS THE MAIN PROGRAM (with header if using ELFOS)
               org           CODE
 #ifdef        ELFOS
               br            start
@@ -303,6 +321,10 @@ T_ASCII:      equ           254
               include       build.inc
               db            'Written by Michael H. Riley',0
 #endif
+
+
+
+; MAIN ENTRY POINT FOR ROMs
 #ifdef        ANYROM
               lbr           new                  ; ROM cold entry point
 notnew:
@@ -343,9 +365,10 @@ start:        ldi           high himem           ; get page of data segment
               plo           rb
 #endif
 #ifndef       ELFOS
-              call          f_freemem            ; ask BIOS for memor size
+              call          f_freemem            ; ask BIOS for memory size
               mov           rb,rf
 #endif
+; If you want to override free memory (for example, to hide yourself in upper RAM) set this
 #ifdef        MEMSIZE_OVERRIDE
               mov           rb,MEMSIZE_OVERRIDE
 #endif
@@ -365,8 +388,12 @@ start:        ldi           high himem           ; get page of data segment
 #else
               br            mainlp
 #endif
+
+; the NEW word
 cnew:         call          xnew                 ; user wants to start over. Do not BLOAD
               br            mainlp
+
+; Common stuff between NEW and startup
 xnew:
               ldi           low freemem          ; set R9 to free memory
               plo           r9
@@ -381,12 +408,15 @@ xnew:
               str           rf                   ; write zeroes as storage terminator
               inc           rf
               str           rf
-              inc           rf
-              str           rf
-              inc           rf
-              str           rf
-              inc           rf
-              mov           rf, basev            ; set base to 10
+;              inc           rf
+;              str           rf
+;              inc           rf
+;              str           rf
+;              inc           rf
+;              mov           rf, basev            ; set base to 10
+; assume all variables are on the same page (they are)
+              ldi           low basev
+              plo           rf
               ldi           0
               str           rf
               inc           rf
@@ -395,7 +425,9 @@ xnew:
 ; clrstacks was here but wipes out machine stack too. 
               ; init 32 bit rng seed
  ;             mov           r7, 012A6h
-              mov           rf, rseed
+ ;             mov           rf, rseed
+              ldi            low rseed
+              plo           rf
               ldi           12h
               str           rf
               inc           rf
@@ -454,7 +486,7 @@ old:          mov           r9,himem             ; load whole thing since this i
 ; *** Main program loop ***
 ; *************************
 mainlp:       mov           rf, prompt
-              ldi           low jump
+              ldi           low jump             ; when jump != 0c0h we are mid multiline colon def
               plo           r9
               ldn           r9
               xri           0c0h                 ; normal operations
@@ -994,7 +1026,7 @@ tokloop:      ldn           r7                   ; get byte from token table
               str           r2                   ; store to stack
               ldn           rb                   ; get byte from buffer
               sm                                 ; do bytes match?
-              lbnz           toknomtch            ; jump if no match
+              bnz           toknomtch            ; jump if no match
               inc           r7                   ; incrment token pointer
               inc           rb                   ; increment buffer pointer
               lbr            tokloop              ; and keep looking
@@ -1006,7 +1038,7 @@ nomtch1:      ldn           r7                   ; get byte from token
               ani           128                  ; looking for last byte of token
               bnz           nomtch2              ; jump if found
               inc           r7                   ; point to next byte
-              br            nomtch1              ; and keep looking
+              lbr            nomtch1              ; and keep looking
 nomtch2:      inc           r7                   ; point to next token
               inc           r8                   ; increment command number
               ldn           r7                   ; get next token byte
@@ -1020,11 +1052,11 @@ cmdend:       ldn           r7                   ; get byte fro token
               str           r2                   ; save to stack
               ldn           rb                   ; get byte from buffer
               sm                                 ; do they match
-              bnz           toknomtch            ; jump if not
+              lbnz           toknomtch            ; jump if not
               inc           rb                   ; point to next byte
               ldn           rb                   ; get it
               smi           (' '+1)              ; it must be whitespace
-              bdf           toknomtch            ; otherwise no match
+              lbdf           toknomtch            ; otherwise no match
 ; *************************************************************
 ; *** Match found, store command number into command buffer ***
 ; *************************************************************
@@ -1101,8 +1133,11 @@ notoken_0:
               br            decnum
 notokenbaseadj: dec           rb                   ; point back at 0
 notokenbase:
-              mov           rd, basen
-              ldn           rd
+;              mov           rd, basen
+;              ldn           rd
+              ldi            low basen
+              plo            r9
+              ldn            r9
               smi           10
               lbnz           hexnum
 decnum:
@@ -1543,11 +1578,11 @@ cserr:        bdf           error                ; jump if stack was empty
               glo           r8
 goodpushb0:
               plo           rb
-              lbr            goodpush
+goodpushl     lbr            goodpush
 crat:
 ci:           call          rpop                 ; get value from return stack
               call          rpush                ; put it back
-              lbr            goodpush
+              br            goodpushl
 cmem:
               ldi           low freemem          ; set R9 to free memory
               plo           r9
@@ -1622,7 +1657,7 @@ cploop:       call          rpop                 ; get top or return stack
               glo           rb
               stxd
               call          pop                  ; get word from data stack
-              lbdf          error
+errorl0:      lbdf          error
               irx
               glo           rb                   ; add to count
               add
@@ -2238,7 +2273,7 @@ ccolcpydn:
               plo           r9
               lda           r9
               xri           0c0h
-              lbnz           colonlp1             ; multiline, just keep it going
+              bnz           colonlp1             ; multiline, just keep it going
  ; if first line, assume it MIGHT be multline
               dec           rb                    ; go back after all
               dec           rb
@@ -2333,7 +2368,7 @@ colonnend:
               plo           r9
               ldn           r9
               xri           0c0h
-              lbnz           colonlp1             ; multiline, just keep it going
+              bnz           colonlp1             ; multiline, just keep it going
               ldn           rb                   ; get next byte
               smi           T_ASCII              ; it must be an ascii mark
               lbnz          error                ; jump if not
@@ -2344,7 +2379,7 @@ colonlp1:                                        ; lda     rb                  ;
               bz           colonmark
               lda           rb
               smi           FSEMI                ; look for the ;
-              lbnz           colonlp1             ; jump if terminator not found
+              bnz           colonlp1             ; jump if terminator not found
               ; check this is really the end
 ;              ldn           rb
 ;              smi           T_EOS
@@ -2498,7 +2533,7 @@ csee_sub0:
               inc           rb
 csub0:        ldn           rb                   ; set up rb to point correctly
               inc           rb
-              bnz           csub0
+              lbnz           csub0
 csee_sub:
               lda           r7                   ; move past next address  (store next in in RF for later)
               phi           rf
@@ -2650,7 +2685,7 @@ cseefunc:     call          dispf
 seefunclp:    call          dispsp
 seefunclpns:
               ldn           r7                   ; get next token
-              lbz            seeexit              ; jump if done
+              bz            seeexit              ; jump if done
               smi           T_ASCII              ; check for ascii
               lbnz           seenota              ; jump if not ascii
               inc           r7                   ; move into string
@@ -3084,13 +3119,13 @@ ccmerr:    lbdf    error               ; jump if error
 cmovelp:   glo     rc
            bnz    cmovestr
            ghi     rc
-           lbnz    cmovestr
+           bnz    cmovestr
            lbr     good
 cmovestr:  lda     r7
            str     r8
            inc     r8
            dec     rc
-           lbr     cmovelp
+           br     cmovelp
 
 csetq:        call          pop
               lbdf          error                ; jump if error
@@ -3177,7 +3212,7 @@ crshift:      call          pop
               lbdf          error                ; jump if stack was empty
               mov           r8,rb
               glo           r7                   ; zero shift is identity
-              bz            rshiftret            ; return with no shift
+              lbz            rshiftret            ; return with no shift
 ; fall through
 rshiftlp:     ghi           r8
               shr                                ; shift hi byte
@@ -3187,7 +3222,7 @@ rshiftlp:     ghi           r8
               plo           r8
               dec           r7
               glo           r7
-              bnz           rshiftlp
+              lbnz           rshiftlp
 rshiftret:    mov           rb,r8
               lbr           goodpush
 ; delay for approx 1 millisecond on 4MHz 1802
@@ -3224,6 +3259,10 @@ cexec:        call          pop
               glo           rb
               str           r8
               call          cexec0
+; R9.1 is so critical, we are going to force it back. Same for X
+              ldi           high himem
+              phi           r9     
+              sex           r2          
               ; if we return RB is pushed on stack
               lbr           goodpush
 cexec0:       lbr           jump                 ; transfer to user code. If it returns, it goes back to my caller
@@ -3461,10 +3500,9 @@ touc:         ldn           rf                   ; check for quote
               bz            touc_dn              ; jump if done
               smi           'a'                  ; check if below lc
               bnf           touc_nxt             ; jump if so
-              smi           27                   ; check upper rage
+              smi           27                   ; check upper range
               bdf           touc_nxt             ; jump if above lc
-              ldn           rf                   ; otherwise convert character to lc
-              smi           32
+              adi           'A'+27
               str           rf
 touc_nxt:     inc           rf                   ; point to next character
               br            touc                 ; loop to check rest of string
@@ -3582,7 +3620,7 @@ inkey:        ldi           015h                 ; need UART line status registe
               dec           r2                   ; correct for inc on out
               inp           UART_DATA            ; read line status register
               ani           1                    ; mask for data ready bit
-              lbz            nokey                ; return if no bytes to read
+              bz            nokey                ; return if no bytes to read
               ldi           010h                 ; select data register
               str           r2                   ; prepare for out
               out           UART_SELECT          ; write to register select port
