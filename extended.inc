@@ -4,6 +4,7 @@
 ; Sometimes (but not always) RC/ASM stops after a double quote
 ; So '." foo " .',0  -- might stop after the quote. Check the listing to be sure
 
+  db '." Wait..." CR',0
 #ifdef NO_TOKEN_COMPRESSION
   db ': +! TUCK @ + SWAP ! ;',0
 ;  db ': -! TUCK @ SWAP - SWAP ! ;',0
