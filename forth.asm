@@ -2088,7 +2088,6 @@ cvarlp:
               dec           r9
               ldn           r9
               phi          rf
-              dec           r9
               ghi           r7                  ; get memory pointer
               str           rf       
               str           r9
@@ -2657,7 +2656,7 @@ seestrlp:     ldn           r7                   ; get next byte
               bz            seenext              ; jump if done with token
               call          disp
               inc           r7                   ; point to next character
-              br            seestrlp             ; and continue til done
+              lbr            seestrlp             ; and continue til done
 seenext:      inc           r7                   ; point to next token
               lbr            seefunclp
 seenota:      ldn           r7                   ; reget token
