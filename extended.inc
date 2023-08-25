@@ -15,7 +15,7 @@
   db ': @+ DUP @ SWAP 2+ SWAP ;',0
   db ': ? @ U. ;',0
   db ': ?DUP DUP IF DUP THEN ;',0
-  db ': .S ." < " BS DEPTH . BS ." > " DEPTH ?DUP IF DUP 0 DO DUP I - PICK . LOOP DROP THEN ;',0
+  db ': .S ." <"" DEPTH .- ." > " DEPTH ?DUP IF DUP 0 DO DUP I - PICK . LOOP DROP THEN ;',0
   db ': > SWAP < ;',0
   db ': >= < NOT ;',0
   db ': <= > NOT ;',0
@@ -53,7 +53,7 @@
   db ': ERASE 0 FILL ;',0
   db ': ESC 0X1B EMIT ;',0
   db ': FALSE 0 ;',0
-  db ': FILL >R 2DUP 1- + R> SWAP C! SWAP DUP 1+ SWAP ROT 1- CMOVE ;',0
+  db ': FILL SWAP >R OVER C! DUP 1+ R> 1- CMOVE ;',0
   db ': FREE MEM U. CR ;',0
   db ': GETBIT >> 1 AND ;',0
   db ': J RP@ 6 + @ ;',0
@@ -109,7 +109,7 @@
   db FCOLON,'@+ ',FDUP,FAT,FSWAP,'2+ ',FSWAP,FSEMI,0
   db FCOLON,'? ',FAT,FUDOT,FSEMI,0
   db FCOLON,'?DUP ',FDUP,FIF,FDUP,FTHEN,FSEMI,0
-  db FCOLON,'.S ." < " BS ',FDEPTH,FDOT,'BS ." > " ',FDEPTH,'?DUP ',FIF,FDUP,'0 ',FDO,FDUP,FI,'- PICK . ',FLOOP,FDROP,FTHEN,FSEMI,0
+  db FCOLON,'.S ." <"',FDEPTH,FDOTM,'." > "',FDEPTH,'?DUP ',FIF,FDUP,'0 ',FDO,FDUP,FI,'- PICK . ',FLOOP,FDROP,FTHEN,FSEMI,0
   db FCOLON,'> ',FSWAP,FLESS,FSEMI,0
   db FCOLON,'>= < NOT ',FSEMI,0
   db FCOLON,'<= > NOT ',FSEMI,0
@@ -142,7 +142,7 @@
   db FCOLON,'ERASE 0 FILL ',FSEMI,0
   db FCOLON,'ESC 0X1B ',FEMIT,FSEMI,0
   db FCOLON,'FALSE 0 ',FSEMI,0
-  db FCOLON,'FILL ',FGTR,'2DUP 1- ',FPLUS,FRGT,FSWAP,FCEXCL,FSWAP,FDUP,'1+ ',FSWAP,FROT,'1- ',FCMOVE,FSEMI,0
+  db FCOLON,'FILL ',FSWAP,FGTR,FOVER,FCEXCL,FDUP,'1+ ',FRGT,'1- ',FCMOVE,FSEMI,0
   db FCOLON,'FREE ',FMEM,FUDOT,FCR,FSEMI,0
   db FCOLON,'GETBIT >> 1 ',FAND,FSEMI,0
   db FCOLON,'J ',FRPAT,'6 + @ ',FSEMI,0

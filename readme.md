@@ -226,7 +226,9 @@ ROT      (a b c -- b c a) - Rotate 3rd stack item to top
 -ROT     (a b c -- c a b) - Rotate top of stack to 3rd position
 DEPTH    ( -- a)          - Get number of items on stack
 .        (a -- )          - print top of stack as signed integer
+.-       (a -- )          - like . but no space after
 U.       (a -- )          - print top of stack as unsigned integer
+U.-      (a -- )          - like U. but no space after
 X.	 (a -- )              - print top of stack as unsigned integer with 0x or 0# prefix 
 EMIT     (a -- )          - print top of stack as ascii character
 EMITP    (a -- )          - print top of stack as printable character

@@ -185,8 +185,7 @@ jump:         equ           fstack+2
 rseed:        equ           jump+3
 basev:        equ           rseed+4
 basen:        equ           basev+1              ; byte access
-eosptr        equ           basev+2
-storage:      equ           eosptr+2
+storage:      equ           basev+2
 stack:        equ           RAMBASE+01ffh
 #endif
               include       bios.inc
@@ -291,6 +290,8 @@ FENDIF:       equ           FBASE+1
 FRSEED:       equ           FENDIF+1
 FRPAT:        equ           FRSEED+1
 FOPAREN:      equ           FRPAT+1
+FDOTM:        equ           FOPAREN+1
+FUDOTM:       equ           FDOTM+1
 
 T_EOS:        equ           253                  ; end of command line
 T_NUM:        equ           255
@@ -1289,14 +1290,6 @@ tokendn:      ldi           T_EOS
               inc           rf 
               ldi           0                    ; need to terminate command string
               str           rf                   ; write to buffer
-; Set eosptr in case we have to move the command line later
-              ldi           low eosptr
-              plo           r9
-              ghi           rf
-              str           r9
-              inc           r9
-              glo           rf
-              str           r9 
               rtn                                ; return to caller
   
 
@@ -1464,14 +1457,23 @@ cmerr:        bdf           error                ; jump if stack was empty
               ghi           rb
               smb
               br            goodpushb
+cdotm:        call          pop
+              bdf           cdoterr
+              ldi           81h                  ; signed no space
+              br            typegoode
 cdot:         call          pop                  ; get value from stack
 cdoterr:      bdf           error                ; jump if stack was empty
               ldi           1
 typegoode:
-              plo           re                   ; signal signed int
+              plo           re                   ; signal signed int (put in e incase SCRT doesn't do it)
 typegood:
-              call          typenum
+              call          typenum              ; RE was in D so this call won't wipe it
               br            good                 ; return
+
+cudotm:       call          pop
+              bdf           cdoterr
+              ldi           80h
+              br            typegoode
 cudot:        call          pop
               bdf           cdoterr              ; jump if stack was empty
               ldi           0
@@ -1669,7 +1671,7 @@ cunerr:       lbdf          error                ; jump if stack was empty
               str           r2
               glo           rb
               xor
-              bnz           unequal              ; jump if not equal
+              lbnz           unequal              ; jump if not equal
               ghi           r7
               str           r2
               ghi           rb
@@ -2648,12 +2650,12 @@ cseefunc:     call          dispf
 seefunclp:    call          dispsp
 seefunclpns:
               ldn           r7                   ; get next token
-              bz            seeexit              ; jump if done
+              lbz            seeexit              ; jump if done
               smi           T_ASCII              ; check for ascii
               lbnz           seenota              ; jump if not ascii
               inc           r7                   ; move into string
 seestrlp:     ldn           r7                   ; get next byte
-              bz            seenext              ; jump if done with token
+              lbz            seenext              ; jump if done with token
               call          disp
               inc           r7                   ; point to next character
               lbr            seestrlp             ; and continue til done
@@ -2739,146 +2741,6 @@ ckeyq:
               call          inkey
               glo           r7
               lbr           goodpushb0
-; see note below about this aborted attempt to improve callot
-#ifdef OLD_CODE_BAD_IDEA           
-callot:       mov           r7,storage
-callotlp1:    lda           r7                   ; get next link
-              phi           r8
-              ldn           r7
-              plo           r8
-              lda           r8                   ; get value at that link
-              phi           rb
-              ldn           r8
-              dec           r8                   ; keep r8 pointing at link
-              bnz           callotno             ; jump if next link is not zero
-              ghi           rb                   ; check high byte
-              bnz           callotno             ; jump if not zero
-              br            callotyes
-callotno:     mov           r7,r8                ; r7=link
-              br            callotlp1            ; and keep looking
-callotyes:    inc           r7                   ; point to type byte
-              ldn           r7                   ; get it
-              smi           FVARIABLE            ; it must be a variable
-              lbnz          error                ; jump if not
-              call          pop
-              lbdf          error                ; jump if error
-;;#ifdef        ALLOT_WORDS                        ; note: enable this and you break see/list
-              glo           rb                   ; multiply by 2
-              shl
-              plo           rb
-              ghi           rb
-              shlc
-              phi           rb
-;;#endif
-
-; while the below is true, it is also more complicated. If ALLOT appears inside a word
-; then you are hosed, because you need to move this still, but you have no way to find it
-; an arbitrary number of levels away.
-; So, for now, at least, I think I am just going to declare ALLOT as risky which is no worse than it was before.
-
-; The problem here is that if you have something like 10 ALLOT <other stuff> is that if the "other stuff" fills in 
-; those 10 cells it will start to wipe out your parsed input line.
-; So... we know eosptr and where we are (the value on the stack) plus the # of bytes (RB)
-; So... we need to copy # of bytes backward from now to where we will be later
-; We need to do this now before the free pointer gets updated and don't forget to update the eosptr
-; HOWEVER if we have allot inside a word, the instruction pointer may be < here at which point
-; forget it
-
-              mov           ra,r2               ; the top item on the stack is 
-              push          r7                  ; our current position in the bytecode stream
-              inc           ra                  ; we need to move that part of the line down to account for the allot
-              lda           ra
-              phi           r7
-              ldn           ra
-              plo           r7   
-              ; if r7<r8 then we don't need to do jack but pop r7 and go
-              ghi           r8
-              str           r2
-              ghi           r7
-              sd
-              bz            allheretest
-              bdf           allotpop7
-allheretest:  glo           r8       
-              str           r2
-              glo           r7
-              sdb
-              bdf           allotpop7       
-; ok we gotta move
-
-                                ; source copy to save input line in R7 (but we saved old R7)
-              glo           rb  ; old except *  ; r8 is the top of free space, we add that to the total count
-              str           r2                  ; however, the pointer will be used, too, so we can -2 from the count
-              glo           r8                  
-              add
-              plo           r8
-              ghi           rb
-              str           r2
-              ghi           r8
-              adc
-              phi           r8
-; new
-              ; need to read/update eos ptr and exec ptr and compute rc 
-              push         rc
-              ldi          low eosptr+1
-              plo          r9
-              ldn          r9
-              str          r2
-              glo          r7          ; [eosptr]-R7 gives count
-              sd
-              plo          rc
-              dec          r9
-              ldn          r9
-              str          r2
-              ghi          r7
-              sdb
-              phi          rc    ; now we have the count
-              inc          rc 
-              inc          r9    ; update eosptr
-              sex          r9  
-              glo          rc
-              add
-              stxd         
-              ghi          rc
-              adc
-              str          r9
-              sex          r2
-              push         r8
-              inc          R8
-              inc          R8
-              ; update exec with count also
-              glo          r8
-              str          ra
-              dec          ra
-              ghi          r8
-              str          ra
-; so now, RC=count, R7=src, R8=dst   
-              call          cmover
-              pop           r8
-              pop           rc
-allotpop7:              
-              pop           r7
-; as you were           
-    
-              dec           r7                   ; point back to link
-              glo           r8                   ; and write new pointer
-              str           r7
-              dec           r7
-              ghi           r8
-              str           r7
-              ldi           low freemem          ; need to adjust free memory pointer
-              plo           r9                   ; put into data frame
-              ghi           r8                   ; and save new memory position
-              str           r9
-              inc           r9
-              glo           r8
-              str           r9
-              ldi           0                    ; zero new position
-              str           r8
-              inc           r8
-              str           r8
-              lbr           good
-              ; end of bad experimental code
-#endif
 #ifdef USE_CBUFFER
 ; very simple. Make sure we are in a good place and adjust the here pointer
 callot:       mov           r7,storage
@@ -3207,58 +3069,29 @@ crpat:        mov           r8,rstack
 ; -----------------------------------------------------------------
 ; additions April 2022  GDJ
 ; -----------------------------------------------------------------
-ccmove:       call          pop
-              lbdf          error                ; jump if error
-              mov           rc,rb                ; rc is count of bytes
-              call          pop
-              lbdf          error               ; jump if error
-              mov           r8,rb                ; r8 is destination address
-              call          pop
-ccmerr:       lbdf          error                ; jump if error
-              mov           r7,rb                ; r7 is source address
-              call          cmover
-              lbr           good
+ccmove:    call    pop
+ccmerr:    lbdf    error               ; jump if error
+           mov     rc,rb               ; rc is count of bytes
+           call    pop
+           bdf     ccmerr               ; jump if error
+           mov     r8,rb               ; r8 is destination address
+           call    pop
+           bdf     ccmerr               ; jump if error
+           mov     r7,rb               ; r7 is source address
 
-              ; transfer data subroutine for general use: RC=count, R7=SRC R8=DST
-              ; begin check for zero byte count else tragedy could result
-              ; for our internal purposes, we will always move forward so we need to do it backward
-              ; the original code always moved forward. It would be smarter to figure out which way to go
-              ; based on src<dst move back to front, dst<src move front to back
-cmover:
-              glo           rc
-              str           r2
-              glo           r7
-              add
-              plo           r7
-              ghi           rc
-              str           r2
-              ghi           r7
-              adc
-              phi           r7
-              dec           r7
-              glo           rc
-              str           r2
-              glo           r8
-              add
-              plo           r8
-              ghi           rc
-              str           r2
-              ghi           r8
-              adc
-              phi           r8
-              dec           r8
+           ; transfer data
+           ; begin check for zero byte count else tragedy could result
+cmovelp:   glo     rc
+           bnz    cmovestr
+           ghi     rc
+           lbnz    cmovestr
+           lbr     good
+cmovestr:  lda     r7
+           str     r8
+           inc     r8
+           dec     rc
+           lbr     cmovelp
 
-cmovelp:      glo           rc
-              bnz           cmovestr
-              ghi           rc
-              bnz           cmovestr
-              rtn              
-cmovestr:     ldn           r7
-              dec           r7
-              str           r8
-              dec           r8
-              dec           rc
-              br            cmovelp
 csetq:        call          pop
               lbdf          error                ; jump if error
               glo           rb                   ; get low of return value
@@ -3333,7 +3166,7 @@ lshiftlp:     glo           r8
               phi           r8
               dec           r7
               glo           r7
-              bnz           lshiftlp
+              lbnz           lshiftlp
 lshiftret:    mov           rb,r8
               lbr           goodpush
 crshift:      call          pop
@@ -3670,12 +3503,16 @@ typenumx:
               mov           rd,rb
               mov           rf, buffer
               glo           re
+              stxd                        ; save flag for later
+              ani           1
               bz            typenumU
-              call          f_intout
+              call          f_intout    ; since D=re SCRT will preserve either way
               br            typeout
-typenumU:     call          f_uintout
+typenumU:     call          f_uintout   ; since D=re SCRT will preserve either way
               br            typeout
 typehex:
+              glo           re
+              stxd
               mov           rd,rb
               mov           rf, buffer
               ghi           rd
@@ -3683,7 +3520,11 @@ typehex:
               call          f_hexout4
               br            typeout
 hexbyte:      call          f_hexout2
-typeout:      ldi           ' '                  ; add space
+typeout:      inc           r2
+              ldn           r2      ; recover flag
+              ani           80h
+              bnz           nospace 
+              ldi           ' '                  ; add space (wish for optional way to supress)
               str           rf
               inc           rf
 nospace:
@@ -3906,6 +3747,8 @@ cmdtable:     db            'WHIL',('E'+80h)
               db            'RSEE',('D'+80h)
               db            'RP',('@'+80h)
               db            ('('+80h)
+              db            '.',('-'+80h)
+              db            'U.',('-'+80h)
               db            0                    ; no more tokens
 cmdvecs:      dw            cwhile               ; 81h
               dw            crepeat              ; 82h
@@ -3991,8 +3834,9 @@ cmdvecs:      dw            cwhile               ; 81h
               dw            cthen                ; alias ENDIF=then (as in gforth)
               dw            crseed
               dw            crpat
-              dw            0
-
+              dw            0             ; no handler for ( comment )
+              dw            cdotm
+              dw            cudotm
 
 #ifdef        STGROM
 #define       EBLOCK 
