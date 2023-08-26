@@ -12,7 +12,7 @@ Last update: 26 Aug 2023 Al Williams
 
 What's new
 ----------
-Verson 0.4 
+Verson 0.5 
 
 Moved gotoxy to extended words so it can be easily removed.
 
