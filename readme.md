@@ -1,18 +1,26 @@
 rc/forth by Mike Riley
 
 Initial Changes by Glen Jolly and Al Williams are in the 0.2 branch.
-The 0.4 is now in the main branch.
+The 0.5 is now in the main branch.
 
 ```
 RcForth forth-doc.txt
 By Mike Riley
 
 Previous  update : 24 May 2022  Glenn Jolly
-Last update: 24 Aug 2023 Al Williams
+Last update: 26 Aug 2023 Al Williams
 
 What's new
 ----------
 Verson 0.4 
+
+Moved gotoxy to extended words so it can be easily removed.
+
+You now have options to allow output with no spaces after numbers and 
+the ability to search for the LAST user word defined so you can override 
+word definitions (or, turn it off for performance). See notes below. Big change along
+with the CBUFFER so I bumped the version to 0.5.
+
 
 By default USE_CBUFFER is enabled. This uses 256 bytes of RAM as a compile buffer.
 So your line is compiled to the buffer and executed. That means colon definitions 
@@ -209,6 +217,7 @@ ALLOT    (n -- )                - Increase the last defined vars storage space (
 CMOVE    (caddr1 caddr2 u -- )  - Move u bytes from caddr1 to caddr2
 HERE     ( -- a)                - Retrieve the current free memory pointer
 ->HERE   (a -- )                - Set the current free memory pointer (dangerous!)
+OPT      ( -- a)                - Address of option variable (bit 0=supress space after numeric output; 1=find first word in dictionary)
 
 
 Function definition:
@@ -226,9 +235,7 @@ ROT      (a b c -- b c a) - Rotate 3rd stack item to top
 -ROT     (a b c -- c a b) - Rotate top of stack to 3rd position
 DEPTH    ( -- a)          - Get number of items on stack
 .        (a -- )          - print top of stack as signed integer
-.-       (a -- )          - like . but no space after
 U.       (a -- )          - print top of stack as unsigned integer
-U.-      (a -- )          - like U. but no space after
 X.	 (a -- )              - print top of stack as unsigned integer with 0x or 0# prefix 
 EMIT     (a -- )          - print top of stack as ascii character
 EMITP    (a -- )          - print top of stack as printable character
@@ -255,7 +262,6 @@ DELAY    (n --)           - Blocking delay of n milliseconds
 SAVE     ( -- )           - Save dictionary to terminal via Xmodem
 LOAD     ( -- )           - Load dictionary to terminal via Xmodem
 BLOAD    ( -- )           - Load extensions as binary block included in src code (note: resets to decimal before loading and leaves you in decimal mode) This happens automatically. If you don't want these functions, use NEW (see below).
-GOTOXY   (x y -- )        - Position the cursor at x,y (works even in hex mode)
 RAND     ( -- b)          - Returns random byte
 EXEC     ( a -- r )       - Do an SCRT call to machine language at address a; Value of RB on return pushed on stack
 OUT      ( b p -- )       - Output byte b to port p (e.g., 4 0xaa out)
@@ -286,6 +292,7 @@ J        (R:loop ndx -- loop ndx)   - Copy of loop index from return stack
 2+       (v -- v)                   - Add 2 to the top of stack
 2-       (v -- v)                   - Subtract 2 from the top of stack
 0=       (v -- v)                   - Returns 1 if TOS is zero, otherwise 0
+GOTOXY   (x y -- )                  - Position VT100 cursor at x,y (works even in hex mode)
 NOT      (v -- v)                   - Return 0 if TOS <> 0, otherwise 1
 U>       (u1 u2 -- ?)               - flag true if u1 is greater than u2
 U>=      (u1 u2 -- ?)               - flag true if u1 is greater than or equal to u2
@@ -343,6 +350,22 @@ $.       (n -- )                    - Output number n in hex regardless of BASE
 
 Notes:
 ------
+
+OPTION is a variable that controls a few optional things. You treat it like any other variable. Currently:
+  - Bit 0 - If set, output commands don't put a space after numbers.
+  For example, if you have two byte variables and try this normally it will look funny:
+  : DISPWORD HIGHPART C@ $. LOWPART C@ $. CR ;
+  But this will fix it:
+  : BETTERDISP 1 OPT ! DISPWORD 0 OPT ! ;
+
+  Note that SEE, LIST, and DUMP all turn this off while running but then put it back the way they found it.
+
+  - Bit 1 - By default, any user words are searched for the last word defined. So you can override a word
+  with a new definition and restore the old definition with a forget or by restoring ->HERE. If bit 1 is set
+  the search finds the first word which means you can't really override anything -- storing new definitions
+  just wastes space. The reason this is important, though, is it is much faster. If you were doing a turnkey
+  deployment and want better performance and don't plan to override words, you can set this bit in your init
+  and enjoy faster performance.
 
 BLOAD has changed by default, but you can put it back or remove it. 
 
