@@ -147,6 +147,7 @@ EF       ( -- v )         - Read value of EF pins
 SETQ     ( x -- )         - Set q to value x
 BYE      ( -- )           - Exit
 NEW      ( -- )           - Wipe dictionary, stack, and reset RNG (careful! no confirmation!)
+.TOK     (t -- )          - Prints name of token T and CR (T must be between 0x80 and to last token; unpredictable if out of range). Mainly to support debuggin.
 ```
 #### Extended Functions:
 The extended functions are implemented as pre-loaded Forth programs.  As such they
@@ -239,6 +240,8 @@ $.       (n -- )                    - Output number n in hex regardless of BASE
   Note that SEE, LIST, and DUMP all turn this off while running but then put it back the way they found it.
 
   - Bit 1 - By default, any user words are searched for the last word defined. So you can override a word  with a new definition and restore the old definition with a forget or by restoring ->HERE. If bit 1 is set  the search finds the first word which means you can't really override anything -- storing new definitions  just wastes space. The reason this is important, though, is it is much faster. If you were doing a turnkey  deployment and want better performance and don't plan to override words, you can set this bit in your init   and enjoy faster performance.
+  - Bit 6 - This requests a turn off of debug/trace mode (see bit 7)
+  - Bit 7 - If bit 7 is set AND you have a defined word of dbg-hook, that word will run before each execution step and gets the address on the stack. You must clean up the stack or bad things will happen. See debug.4th in the examples directory. This is currently largely untested.
 
 * BLOAD has changed by default, but you can put it back or remove it. 
 The previous state was BLOAD loaded a binary blob that included address and all the state variables. So it wipes out everything

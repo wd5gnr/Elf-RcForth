@@ -85,7 +85,7 @@
   db ': BASEOUT BASE @ -ROT BASE ! . BASE ! ;',0
   db ': #. 0#10 BASEOUT ;',0
   db ': $. 0X10 BASEOUT ;',0
-  db ': %. 0x8000 BEGIN 2DUP AND IF 0x31 ELSE 0x30 THEN EMIT 1 >> DUP NOT UNTIL SPACE ;',0
+  db ': %. 0x8000 BEGIN 2DUP AND IF 0x31 ELSE 0x30 THEN EMIT 1 >> DUP NOT UNTIL SPACE DROP DROP ;',0
   include custom.inc
   db '." Ext words loaded"CR INIT',0
 #else
@@ -178,7 +178,7 @@
   db FCOLON,'#.',T_NUM,0,10,'BASEOUT ;',0
   db FCOLON,'$.',T_NUM,0,16,'BASEOUT ;',0
   db FCOLON,'%.',T_NUM,80h,00,FBEGIN,'2DUP',FAND,FIF,T_NUM,0,31h,FELSE,T_NUM,0,30h
-  db         FTHEN,FEMIT,'1 ',FGTGT,FDUP,'NOT',FUNTIL,'SPACE',FSEMI,0
+  db         FTHEN,FEMIT,'1 ',FGTGT,FDUP,'NOT',FUNTIL,'SPACE',FDROP,FDROP,FSEMI,0
   include custom.inc
   db '." Ext words loaded"CR',0
   db 'INIT',0
