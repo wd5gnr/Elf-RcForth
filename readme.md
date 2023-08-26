@@ -1,160 +1,40 @@
-rc/forth by Mike Riley
+# rc/forth by Mike Riley
+
+ ## with additions by Al Williams and Glenn Jolly
+
+## Version 0.5
+Last update: 26 Aug 2023
+See [What's New? for news](#new)
+
+## Contents
+* [What Is It?](#what)
+* [Key Architecctural Items](#key)
+* [Words](#words)
+* [Notes](#notes)
+* [Tutorial](#tutor)
+* [What's New?](#new)
+* [Extended Word Source](#ext)
+
+[](#what)
+## What Is It?
+This is a Forth system for the RCA 1802, popular in the "COSMAC ELF" computers, among other things. It is a bit odd, in consideration of the small hardware, but Mike made some interesting design choices. If you know Forth, you won't find anything too surprising and versions 0.2 up keep eradicating some of the surprising things.
+
+If you don't know Forth, there is a short tutorial from the original readme, below. There's plenty of info on the web, too. 
+[](#key)
+## Key Architectural Items
+* The "compiler" actually converts your input into tokens consisting of core words, numbers, and strings. So your words do not get tokens, they are stored as ASCII strings which has some merits and some difficulties
+* 16-bit integers
+* Limited string support
+* Comments are not stored
+* Save and load is either via ASCII (think of it as a virtual paper tape punch and reader) or using binary files via XMODEM
+* You can select using the first found definition (faster) or the last found (more like normal Forth)
+* Extended words are loaded from ROM and can be unloaded for space
+
+[](#words)
+## Words
+
+#### Note on stack representation:
 
-Initial Changes by Glen Jolly and Al Williams are in the 0.2 branch.
-The 0.5 is now in the main branch.
-
-```
-RcForth forth-doc.txt
-By Mike Riley
-
-Previous  update : 24 May 2022  Glenn Jolly
-Last update: 26 Aug 2023 Al Williams
-
-What's new
-----------
-Verson 0.5 
-
-Moved gotoxy to extended words so it can be easily removed.
-
-You now have options to allow output with no spaces after numbers and 
-the ability to search for the LAST user word defined so you can override 
-word definitions (or, turn it off for performance). See notes below. Big change along
-with the CBUFFER so I bumped the version to 0.5.
-
-
-By default USE_CBUFFER is enabled. This uses 256 bytes of RAM as a compile buffer.
-So your line is compiled to the buffer and executed. That means colon definitions 
-and variables are created in normal memory and don't step on your commands.
-This handily prevents problems with ALLOT as described below.
-
-However, it is a big change so you can compile with it off if you prefer the old behavior.
-
-You can now put ( ) comments in files you plan to load. They are not saved (same as \ comments).
-So:
-
-: FOO ( a -- 2a ) 2 * ;  \ You can have this exact line in  a file and the comments are ignored
-
-Note the parens are tokens, so you can't have:
-
-(My comment)
-
-However, you can have:
-( My comment (see other comments here) )
-
-The first ) doesn't "work" becuase it does not have <space>)<space>
-
-
-Obviously, don't use FOPAREN in compressed tokens for extended.inc or custom.inc -- makes no sense!
-
----
-
-I have had to back away from the "safe" ALLOT since this is more complex than it appears. 
-The issue is if you have something like:
-
-VARIABLE TRACKER 100 ALLOT TRACKER 100 ERASE ." Tracking array ready" CR 
-
-The ERASE will zero out 100 bytes including the rest of your command line.
-
-It should be OK, however, to say:
-
-VARIABLE TRACKER 100 ALLOT
-TRACKER 100 ERASE ." Tracking array ready" CR
-
-The , and C, words now work more like you think they should since the restrictions on variable lines is gone
-
-###
-
-You can now include things after a colon definition, a variable, and allot is now safer.
-So you can now say:
-
-VARIABLE NCC 1701 ALLOT 0 NCC !
-
--or-
-: SILLY 2 * . ; 10 SILLY
-
-###
-
-New extended words. OVER bug fixed.
-
-0 DELAY now returns immediately instead of acting like 0x10000 DELAY
-
-More BLOAD options. A few new extended words when using the new BLOAD.
-
-No extra spaces in SEE/LIST
-
-RSEED lets you view/store the random number generation seed
-
-See rambuild.sh to build a version you can load to RAM at 0 with a ROM at 8000. You can configure in forth.asm for other configurations.
-
-Restructured BLOAD words
-
-You can use multiple line colon definitions (see examples/hilomulti.4th). If you are defining a word, the prompt will be :ok instead of ok.
-Note the multiple lines are not stored. You wind up with the same definition either way.
-
-^C will abort your input line even in a multi-line definition. Good for when you forget to use a semicolon on a single-line entry.
-
-###
-
-Improved byte output of SEE/LIST for variables
-
-###
-
-Fixed long-standing bug with < and U< that affected ABS, and all comparison operators. NOTE: This may break your scripts and may break some of the examples (will fix)
-
-###
-
-Size changes. Errata note about comparison operators
-
-IMPORTANT: ALLOT now deals with bytes not words! See the word CELLS
-
-###
-
-Fixed new regression. 
-
-New words: ENDIF, CELLS, , (Comma), and C,
-
-You can add comments by entering a \ which ignores the entire rest of the line. This is useful for
-files you intend to load. Comments are not stored.
-
-New words: here and ->here
-
-###
-
-Force load the high portion of freememory pointers which could have been the source of intermittent issues with larger programs (not true; reverted)
-
-Bload now happens when you start Forth new automatically
-
-If you don't want the extra words, issue NEW. You can issue that anytime to wipe out everything to the core words + BASE
-
-
-If you forget to close a colon definition or if you put extra things
-after a colon definition or a variable you will get an error (note, now, you can enter multiline definitions)
-
-###
-
-Simple variables get initialized to 0 automatically
-
-
-Numbers can always be written as 0#10 or 0xFF (decimal 10 and hex FF).
-
-SEE now dumps variables in a way that will recreate them if you read it back in.
-
-SEE always puts 0# or 0x in front of constants so reading a definition in works regardless of mode.
-
-LIST dumps everything from the user dictionary in a way that it can be read back in later.
-
-EXEC does an SCRT call to a machine language subroutime (see examples below)
-
-X. is like . but puts 0x or 0# in front depending on BASE
-
-Code size is reduced! (b2-9b = 23 pages)
-
-If you pass -DNO_BLOAD to the assembler, you get a smaller version with no bload. Bload is still a word
-but it resolves to the same as LOAD and, presumably, you'll XMODEM whatever extended words you want or
-paste them in. No need to consume ROM with the words if you are going to load your own anyway!
-
-Note on stack representation:
------------------------------
 In the instructions listed below, the state of the stack is shown in
 parentheses.  symbols before the -- represent the stack before the instruction
 is executed, symbols after the -- represent the stack after execution.
@@ -162,16 +42,14 @@ The top of stack is to the right. Example:  (1 2 -- 3) This shows that 2
 is on the top of the stack, and 1 is 2nd from the top, after the instruction
 is executed 3 will be on the stack, the 1 and 2 will be consumed.
 
-Numbers
--------
+#### Numbers
 NN - positive number in current BASE
 -NN - negative decimal number (when BASE=10)
 0xNN - unsigned hex number (any BASE; x is not case sensitive)
 0#nn - unsigned decimal number (any BASE)
 
-
-Arithmetic Operators:
----------------------
+#### Arithmetic Operators:
+```
 +        (a b -- c)       - Add top 2 stack entries
 -        (a b -- c)       - Subtract top 2 stack entries
 *        (a b -- c)       - Multiply top 2 stack entries
@@ -184,9 +62,9 @@ xor      (a b -- c)       - Logically xor top 2 stack values
 >>       (a n -- b)       - Right shift a by n bits (unsigned)
 <        (a b -- ?)       - Return 1 if a < b else 0
 U<       (u1 u2 -- ?)     - Return 1 if u1 < u2 else 0 (unsigned)
-
-Control Operators:
-------------------
+```
+#### Control Operators:
+```
 BEGIN    ( -- )           - Beginning of BEGIN-UNTIL loop
 UNTIL    (B -- )          - Ending of BEGIN-UNTIL loop
 WHILE    (B -- )          - Beginning of while-repeat loop
@@ -202,10 +80,10 @@ ENDIF    ( -- )           - Same as THEN
 >R       (a -- )          - Move top of data stack to return stack
 R>       ( -- a)          - Move top of return stack to data stack
 R@       ( -- a)          - Copy top of return stack to data stack
+```
 
-
-Variables:
-----------
+#### Variables:
+```
 VARIABLE name                   - Create a variable (not allowed in functions)
 @        (a -- v)               - Retrieve value from address
 SP@      ( -- a)                - Get address of tos pointer
@@ -218,17 +96,17 @@ CMOVE    (caddr1 caddr2 u -- )  - Move u bytes from caddr1 to caddr2
 HERE     ( -- a)                - Retrieve the current free memory pointer
 ->HERE   (a -- )                - Set the current free memory pointer (dangerous!)
 OPT      ( -- a)                - Address of option variable (bit 0=supress space after numeric output; 1=find first word in dictionary)
+```
 
-
-Function definition:
---------------------
+#### Function definition:
+````
 : name                    - Create a function
 ;                         - End of function
+````
 
-Stack Operators:
-----------------
-DUP      (a -- a a)       - Duplicate top stack value
-DROP     (a -- )          - Drop top stack value
+#### Stack Operators:
+```
+DUP      (a -- a a)       - Duplicate top stack valueDROP     (a -- )          - Drop top stack value
 SWAP     (a b -- b a)     - Swap top 2 stack entries
 OVER     (a b -- a b a)   - Copy 2nd stack value to top
 ROT      (a b c -- b c a) - Rotate 3rd stack item to top
@@ -239,12 +117,11 @@ U.       (a -- )          - print top of stack as unsigned integer
 X.	 (a -- )              - print top of stack as unsigned integer with 0x or 0# prefix 
 EMIT     (a -- )          - print top of stack as ascii character
 EMITP    (a -- )          - print top of stack as printable character
+```
 
-
-Others:
--------
-\                         - Comment from here to end of line (needs space after it; not \comment but \ comment)
-CR       ( -- )           - Print a CR/LF pair
+#### Others:
+```
+\                         - Comment from here to end of line (needs space after it; not \comment but \ comment)CR       ( -- )           - Print a CR/LF pair
 MEM      ( -- a)          - return amount of memory
 WORDS    ( -- )           - Display vocabulary words
 SEE name                  - See what is bound to a name
@@ -270,13 +147,12 @@ EF       ( -- v )         - Read value of EF pins
 SETQ     ( x -- )         - Set q to value x
 BYE      ( -- )           - Exit
 NEW      ( -- )           - Wipe dictionary, stack, and reset RNG (careful! no confirmation!)
-
-Extended Functions:
--------------------
+```
+#### Extended Functions:
 The extended functions are implemented as pre-loaded Forth programs.  As such they
 can be viewed with the SEE command and removed with the FORGET command. 
 
-
+```
 NIP      (b a -- a)                 - Drop 2nd item from stack
 TUCK     (b a -- a b a)             - Place copy of TOS before 2nd on stack
 PICK     (an..a0 k -- an..a0 ak)    - Copy k-th stack element to stack
@@ -347,33 +223,26 @@ BASEOUT  (n b --)                   - Output number n in base b (preserves BASE)
 #.       (n -- )                    - Output number n in decimal regardless of BASE
 $.       (n -- )                    - Output number n in hex regardless of BASE
 %.       (n -- )                    - Output number n in binary 
-
-Notes:
-------
-
-OPTION is a variable that controls a few optional things. You treat it like any other variable. Currently:
-  - Bit 0 - If set, output commands don't put a space after numbers.
-  For example, if you have two byte variables and try this normally it will look funny:
+```
+[](#notes)
+## Notes:
+* OPTION is a variable that controls a few optional things. You treat it like any other variable. Currently:
+  - Bit 0 - If set, output commands don't put a space after numbers.  For example, if you have two byte variables and try this normally it will look funny:
+  ```
   : DISPWORD HIGHPART C@ $. LOWPART C@ $. CR ;
+  ```
   But this will fix it:
+  ```
   : BETTERDISP 1 OPT ! DISPWORD 0 OPT ! ;
+  ```
 
   Note that SEE, LIST, and DUMP all turn this off while running but then put it back the way they found it.
 
-  - Bit 1 - By default, any user words are searched for the last word defined. So you can override a word
-  with a new definition and restore the old definition with a forget or by restoring ->HERE. If bit 1 is set
-  the search finds the first word which means you can't really override anything -- storing new definitions
-  just wastes space. The reason this is important, though, is it is much faster. If you were doing a turnkey
-  deployment and want better performance and don't plan to override words, you can set this bit in your init
-  and enjoy faster performance.
+  - Bit 1 - By default, any user words are searched for the last word defined. So you can override a word  with a new definition and restore the old definition with a forget or by restoring ->HERE. If bit 1 is set  the search finds the first word which means you can't really override anything -- storing new definitions  just wastes space. The reason this is important, though, is it is much faster. If you were doing a turnkey  deployment and want better performance and don't plan to override words, you can set this bit in your init   and enjoy faster performance.
 
-BLOAD has changed by default, but you can put it back or remove it. 
-
+* BLOAD has changed by default, but you can put it back or remove it. 
 The previous state was BLOAD loaded a binary blob that included address and all the state variables. So it wipes out everything
-and requires fixing if you add/delete/rearrange variables or move the RAM base address. It was hard to add things to the BLOB.
-
-You can restore this behavior at the top of forth.asm by defining BLOAD_BIN and undefining BLOAD_TEXT. The blobs have been moved to two parts. A build-specific header
-and a RAM base list of words. In other words, all machines with RAM at 0 can share the words even if they need different headers for setting
+and requires fixing if you add/delete/rearrange variables or move the RAM base address. It was hard to add things to the BLOB. You can restore this behavior at the top of forth.asm by defining BLOAD_BIN and undefining BLOAD_TEXT. The blobs have been moved to two parts. A build-specific header and a RAM base list of words. In other words, all machines with RAM at 0 can share the words even if they need different headers for setting
 variables. You can also shut off BLOAD with NO_BLOAD (the BLOAD work becomes a synonym with LOAD, in that case, and does not auto run).
 
 The new behavior allows you to put nearly any command you want as 0 separated strings into extended.inc. These can define words, variables, or execute words.
@@ -383,107 +252,62 @@ the old BLOAD, the new BLOAD does not wipe out what you already have.
 
 The only problem is the text can get large. Unless you define NO_TOKEN_COMPRESSION you can use normal command tokens at will in the file to reduce the size.
 For example:
-
+```
 : makeeven dup 1 and if 1+ then ;
-
+```
 You can store this as is (just put a zero at the end). But you can also do this:
-FCOLON,'makeeven ',FDUP,'1 ',FAND,FIF,'1+ ',FTHEN, FSEMI,0
+```
+FCOLON,'makeeven',FDUP,'1 ',FAND,FIF,'1+ ',FTHEN, FSEMI,0
+```
+This includes the end zero. Note that you have to use strings for numbers and non-core words like 1+. You can mix and match as much as you want. Note, too, that FDOTQT is a bit strange (see the inc file for an example). All of the tokens are at the top of the forth.asm file.
 
-This includes the end zero. Note that you have to use strings for numbers and non-core words like 1+. You can mix and match as much as you want.
-Note that FDOTQT is a bit strange (see the inc file for an example). All of the tokens are at the top of the forth.asm file.
+There is a custom.inc file that will be empty on GitHub. You can add your own defs there if you don't want them mixed in with the "factory default" words. There is an empty init word that you can add to, if you like.
 
-There is a custom.inc file that will be empty on GitHub. You can add your own defs there if you don't want them mixed in with
-the "factory default" words. There is an empty init word that you can add to, if you like.
-
-XXXX
-
-
-I noticed that the documentation for all the comparison operators looks backwards and is backwards from gforth. 
-What's more is that equality parts are messed up also. This WILL WILL BREAK YOUR CODE from earlier versions. In the same vein. Jolly fixed UNTIL to work properly 
+* I noticed that the documentation for all the comparison operators looks backwards and is backwards from gforth. What's more is that equality parts are messed up also. This WILL WILL BREAK YOUR CODE from earlier versions. In the same vein. Jolly fixed UNTIL to work properly 
 and that also breaks old code.
 
-gForth:
-
+#### gForth:
+```
 ok 5 2 < . 
 0
 ok 5 5 < .
 0
-
-RcForth
+```
+#### RcForth
+```
 ok 5 2 < .
 1
 ok 5 5 < .
 1
+```
 
-This appears to be in the original Jolly implement of cless and culess (flipped DF). Fixed now (maybe) but will break code and
-probably breaks some of the examples (will be fixed).
+This appears to be in the original Jolly implement of cless and culess (flipped DF). Fixed now (maybe) but will break code and probably breaks some of the examples (will be fixed).
 
-XXXX
+* old-style BLOAD resets the system to decimal before loading.
 
-old-style BLOAD resets the system to decimal before loading.
+* DUMP really prefers hex mode for formatting
 
-XXXX
+* If you are in hex mode, a, b, c, d, e, and f are not words. So "VARIABLE A" will fail in hex mode. So will abc, for example.
 
-DUMP really prefers hex mode for formatting
-
-XXXX
-
-If you are in hex mode, a, b, c, d, e, and f are not words. So "VARIABLE A" will fail in hex mode. So will abc, for example.
-
-XXXX
-
-Nothing is executed after VARIABLE xxx. That means:
-VARIABLE foo 100 allot
-Does NOT do what you think it does. End the line after the foo.
-(No longer true; this now works)
-
-You also need to be careful with allot... 
-I briefly tried to make it safe, but it is trickier than it appears
-
-You can also add things after a colon definition safely.
-
-Suppose you create variable AAA:
-
-VARIABLE AAA
-
-Your memory now looks like this:
-<STUFF><AAA><END OF AAA><EMPTY SPACE>
-
-Now you enter the following:
-255 ALLOT AAA 200 0 FILL 10 2 + .
-
-Just after the ALLOT your memory now looks like:
-<STUFF><AAA><toenized version of 255 ALLOT AAA 200 0 FILL 10 2 + .><END OF AAA>
-
-So now, when FILL executes, it is going to wipe out your command line, so 10 2 + . is going to disappear.
-In this case, the zero gracefully ends it, but in other cases, not so much!
-
-As long as your input stream stays "ahead" of the changes, you should be OK but be careful.
-
-
-XXXX
-
-SEE emits all integers as unsigned with 0x or 0# prefixes to faciliate reloading correctly
+* SEE emits all integers as unsigned with 0x or 0# prefixes to faciliate reloading correctly
 This means that -1 test ! see test will show 0#65535 not -1 but those are the same thing.
 
-XXXX
-
-HEX and DECIMAL don't work until AFTER the line is parsed. So you can't say:
+* HEX and DECIMAL don't work until AFTER the line is parsed. So you can't say:
+```
 : doit hex 0f 2 * ;
-
+```
 Unless you were already in hex, of course. The hex command would only affect the NEXT line.
 
 However, they do work with output. So a possible definition is:
+```
 : HEXOUT 0x10 BASE @ -ROT BASE ! . BASE ! ;   \ print number in hex and put BASE back to how it was
-
-XXXX
-
-To create an array, you can use the comma or c, operators. This has changed recently to be more like normal Forth.
-
+```
+* To create an array, you can use the comma or c, operators. This has changed recently to be more like normal Forth.
+```
 VARIABLE MYARRAY 1 , 2 , 3 , 4 ,
-
+```
 Note the spaces around the commas and that there is one at the end which will create one extra cell.
-
+```
 SEE MYARRAY
 VARIABLE MYARRAY
 0x08 ALLOT
@@ -492,37 +316,25 @@ VARIABLE MYARRAY
 0x03 MYARRAY 0x04 + !
 0x04 MYARRAY 0x06 + !
 0x00 MYARRAY 0x08 + !
-
-
+```
 You can also use ALLOT but this is now in bytes not words. Use CELLS or just multiply by 2:
-
+```
 VARIABLE thing
 25 CELLS ALLOT
-
+```
 Of course, if you want bytes, don't use CELLS. This is a good way to initialize a 
 machine language program:
-
+```
 : CSTORE SWAP c! ;
 VARIABLE PGM
 PGM 0x7A c, 0x7B c, 0xD5 CSTORE
-
+```
 Previous code that used word-sized ALLOT will break
 
-See the notes above about how ALLOT can cause you to overwrite the current command line. When in doubt, do the ALLOT 
-on its own line and then start a new line.
+* Comments and line breaks are not stored
+[](#tutor)
+## Forth Tutorial:
 
-XXX
-
-Comments and line breaks are not stored
-
-XXX
-
-In see/list the extra space after numbers is an artifact of how they are printed. This maybe fixed in the future. (fixed)
-
-XXXX
-
-Forth Tutorial:
----------------
 Forth is primarily a stack based language.  Arguments for functions are first
 pushed onto the stack and then the instruction is executed.  Pushing a number
 onto the stack is done merely by mentioning the number:
@@ -590,6 +402,7 @@ is left when they are not equal.
 
 The DEPTH command will place onto the top of the stack the number of items in
 the stack:
+
     ok 4 5 6 DEPTH . CR
     3
     ok
@@ -597,6 +410,7 @@ the stack:
 Note that the depth command does not include its own answer in the total.
 
 The top two stack values can be swapped using the SWAP command:
+
     ok 2 3 . . CR
     3 2
     ok 2 3 SWAP . . CR
@@ -604,12 +418,13 @@ The top two stack values can be swapped using the SWAP command:
     ok
 
 The top of the stack can be duplicated using the DUP command:
-    ok 2 . . CR
-    2 stack empty
-    ok 3 DUP . . CR
-    3 3
-    ok
-
+```
+ok 2 . . CR
+2 stack empty
+ok 3 DUP . . CR
+3 3
+ok
+```
 The IF command can be used for conditional exection.  IF examines the top of
 the stack to determine what to execute:
 
@@ -647,19 +462,21 @@ reaches 10.  Notice also that a loop is always executed at least once:
     ok
 
 To increment the loop counter by something other than 1, use the +LOOP command:
+```
     ok 10 0 DO I . 2 +LOOP CR
     0 2 4 6 8
     ok 10 0 DO I . 3 +LOOP CR
     0 3 6 9
-
+```
 The next two loop types are uncontrolled, they loops are executed so long as
 the top of stack is non-zero at the time of test.  The BEGIN UNTIL loop
 has its test at the end, and therefore just like DO loops, the loop will
 always be executed at least once:
+```
     ok 5 BEGIN DUP . 1 - DUP UNTIL CR
     5 4 3 2 1
     ok
-
+```
 Notice we used the DUP command here first to make a duplicate of our counter
 for the . command, and then a second DUP before the UNTIL.  UNTIL takes the
 top of the stack in order to determine if another loop is needed.
@@ -690,32 +507,35 @@ we want to store on the stack, and then mention the variable:
 
 This then stores 5 into A and 10 into B.  To retrieve the values of variables,
 use the @ command:
+```
     ok A @ . CR
     5
     ok B @ . CR
     10
     ok A @ B @ + . CR
     15
-
+```
 To immediately print the value in a variale, you can use the SEE command:
+```
     ok SEE A
     5
     ok
-
+```
 Note that the SEE command provides its own CR/LF.
+```
     ok SEE A SEE B
     5
     10
     ok
-
+```
 The real power of forth is that it allows you to define your own commands!
 Commands are defined using the : command and terminated with the ; command.
 Note. that Rc/Forth requires the entire command to be created in one input
 cycle.  try this one:
-
+```
     ok : STARS 0 DO 42 EMIT LOOP ;
     ok
-
+```
 If you look at the WORDS now, you will see another new name: STARS.  You can
 also use the SEE command on functions to see their definitions:
     ok SEE STARS
@@ -749,138 +569,193 @@ The easiest way to do it is create a variable with enough space to hold your cod
 
 For example, to create 16 bytes to hold code:
 
-hex
-variable pgm
-10 allot
+You can define helper words:
 
-You can define some helper words:
-: code! ( a byte -- a+1 ) swap dup rot swap c! !+ ;
+    hex
+    variable pgm
+    10 allot
+
+You can define helper words:
+
+
+    : code! ( a byte -- a+1 ) swap dup rot swap c! !+ ;
 
 This leaves the address for the next call so it is clean to define a word to stop the sequence:
+
+
 : endcode ( a -- ) drop ;
 
 Let's write AA to the LEDs using the following code:
 
-SEX R3  ; make X=P
-OUT 4   ; write M(X) RX+1 (that is write the next byte)
-DB AA   ; the byte to write
-SEX R2  ; back to X=2
-D5      ; SCRT return (SEP R5)
+    SEX R3  ; make X=P
+    OUT 4   ; write M(X) RX+1 (that is write the next byte)
+    DB AA   ; the byte to write
+    SEX R2  ; back to X=2
+    D5      ; SCRT return (SEP R5)
 
 In hex, this is E3 64 AA E2 D5, which is 5 bytes. We can fit it in our pgm variable or define a variable with enough space.
 
 Issue the following (be sure you are in hex mode):
 
-pgm e3 code! 64 code! aa code! e2 code! d5 code! endcode
+    pgm e3 code! 64 code! aa code! e2 code! d5 code! endcode
 
 If you want to verify:
-pgm 10 dump
+
+    pgm 10 dump
 
 Now, we can call our code and drop the return value since we don't care about it. Fun fact. If your code doesn't touch the return code it is the call
 address. So you can make multiple calls without reloading the address as long as your codes doesn't touch the return value register (RB).
 
-pgm exec drop
+    pgm exec drop
 
 You could make that into a word, of course:
-: mlpgm pgm exec drop ;
+
+
+    : mlpgm pgm exec drop ;
 
 You can call many BIOS calls
-variable bioskey
-10 allot
-bioskey f8 code! 0 code! bb code! d4 code! ff code!
-6 code! ab code! d5! endcode
+
+    variable bioskey
+    10 allot
+    bioskey f8 code! 0 code! bb code! d4 code! ff code!
+    6 code! ab code! d5! endcode
 
 This corresponds to:
-LDI 0 ; zero out top byte of return register
-PHI RB
-CALL bios_key  ; read key (BIOS ff06)
-PLO RB         ; put key in RB.0
-RETURN
+
+    LDI 0 ; zero out top byte of return register
+    PHI RB
+    CALL bios_key  ; read key (BIOS ff06)
+    PLO RB         ; put key in RB.0
+    RETURN
 
 In this case we want the return code:
 bioskey exec .
 
 You can define a word to drop the return code for the cases that you don't care:
-: exec_ exec drop ;
+
+
+    : exec_ exec drop ;
 
 Another handy word for defining machine code words:
 
-: ASMCODE DUP 1+ PICK SWAP DUP ROT 1- + SWAP 00  DO DUP ROT SWAP C! 1- LOOP DROP  DROP ;
+
+    : ASMCODE DUP 1+ PICK SWAP DUP ROT 1- + SWAP 00  DO DUP ROT SWAP C! 1- LOOP DROP  DROP ;
 
 Use it like this:
 
-7000 7A 7B 30 00 4 asmcode
+    7000 7A 7B 30 00 4 asmcode
 
 Here 7000 is the address, and there are 4 op codes. The top of the stack is the number of opcodes/bytes. Note it works backwards so
 it reads "normal." That is: 7000: 7A 7B 30 00. Normally, you would not hard code an address, but would use a variable as above.
 
-
-
 This completes this introductory tutorial on Forth.  Experiment with the
 commands and you will find it is really easy to pick it up!
 
-: NIP SWAP DROP ;
-: TUCK SWAP OVER ;
-: PICK 2 * 2 + SP@ + @ ;
-: 2DUP OVER OVER ;
-: 2DROP DROP DROP ;
-: 2OVER 3 PICK 3 PICK ;
-: 2SWAP >R -ROT R> -ROT ; 
-: TRUE 1 ;
-: FALSE 0 ;
-: J R@ ;
-: 1+ 1 + ; 
-: 1- 1 - ;
-: 2+ 2 + ;
-: 2- 2 - ;
-: 0= 0 = ;
-: NOT 0= ;
-: U> SWAP U< ;
-: U>= 2DUP U> >R = R> OR ;
-: U<= U>= NOT ;
-: > SWAP < ;
-: <=  > NOT ;
-: >=  < NOT ;
-: 0> 0 > ;
-: 0< 0 < ;
-: FREE MEM U. CR ;
-: +! SWAP OVER @ + SWAP ! ;
-: -! SWAP OVER @ SWAP - SWAP ! ;
-: *! SWAP OVER @ * SWAP ! ;
-: /! SWAP OVER @ SWAP / SWAP ! ;
-: C+! DUP >R C@ + R> C! ;
-: C-! DUP >R C@ SWAP - R> C! ;
-: @+ DUP @ SWAP 2 + SWAP ;
-: ? @ U. ;
-: NEG 0 SWAP - ;
-: MIN 2DUP > IF SWAP THEN DROP ;
-: MAX 2DUP < IF SWAP THEN DROP ;
-: UMIN 2DUP U> IF SWAP THEN DROP ;
-: UMAX 2DUP U< IF SWAP THEN DROP ;
-: ?DUP DUP IF DUP THEN ;
-: ABS DUP 0< IF 0 SWAP - THEN ;
-: BL 32 ;
-: SPACE 32 EMIT ;
-: SPACES 0 DO 32 EMIT LOOP ;
-: CLS 27 EMIT 91 EMIT 50 EMIT 74 EMIT 27 EMIT 91 EMIT 72 EMIT ;
-: LSHIFT DUP WHILE SWAP 2 * SWAP 1 - DUP REPEAT DROP ;
-: RSHIFT DUP WHILE SWAP 2 / SWAP 1 - DUP REPEAT DROP ;
-: INVERT -1 XOR ;
-: SGN DUP IF -32768 AND IF -1 ELSE 1 THEN THEN ;
-: MOD DUP ROT DUP ROT / ROT * - ;
-: /MOD OVER OVER MOD -ROT / ;
-: GETBIT >> 1 AND ;
-: SETBIT 1 SWAP << OR ;
-: CLRBIT 1 SWAP << -1 XOR AND ;
-: TGLBIT 1 SWAP << XOR ;
-: BYTESWAP DUP 8 >> SWAP 255 AND 8 << OR ;
-: FILL SWAP >R OVER C! DUP 1+ R> 1- CMOVE ;
-: ERASE 0 FILL ;
-: CLEAR DEPTH WHILE DROP DEPTH REPEAT ;
-: .S ." < " DEPTH 8 EMIT . 8 EMIT ." > " DEPTH ?DUP IF DUP 0 DO DUP I - PICK . LOOP DROP THEN ;
-: TYPE DUP IF 0 DO DUP C@ EMITP 1 + LOOP ELSE DROP THEN DROP ;
-: DUMP CR 5 SPACES 16 0 DO I . LOOP 0 DO CR DUP . 16 0 DO DUP C@ . 1+ LOOP DUP 16 - 16 TYPE 16 +LOOP DROP CR ;
 
+[](#new)
 
+## What's New?
 
+* Moved gotoxy to extended words so it can be easily removed.
+
+* You now have options to allow output with no spaces after numbers and 
+the ability to search for the LAST user word defined so you can override 
+word definitions (or, turn it off for performance). See notes below. Big change along
+with the CBUFFER so I bumped the version to 0.5.
+
+* By default USE_CBUFFER is enabled. This uses 256 bytes of RAM as a compile buffer.
+So your line is compiled to the buffer and executed. That means colon definitions 
+and variables are created in normal memory and don't step on your commands.
+This handily prevents problems with ALLOT as described below.
+
+* However, it is a big change so you can compile with it off if you prefer the old behavior.
+* You can now put ( ) comments in files you plan to load. They are not saved (same as \ comments).
+* 
+So:
 ```
+: FOO ( a -- 2a ) 2 * ;  \ You can have this exact line in  a file and the comments are ignored
+```
+Note the parens are tokens, so you can't have:
+```
+(My comment)
+```
+However, you can have:
+```
+( My comment (see other comments here) )
+```
+The first ) doesn't "work" becuase it does not have {space)){space} Obviously, don't use FOPAREN in compressed tokens for extended.inc or custom.inc -- makes no sense!
+
+* I have had to back away from the "safe" ALLOT since this is more complex than it appears. 
+
+* You can now include things after a colon definition, a variable, and allot is now safer.
+So you can now say:
+```
+VARIABLE NCC 1701 ALLOT 0 NCC !
+```
+-or-
+```
+: SILLY 2 * . ; 10 SILLY
+```
+* New extended words. OVER bug fixed.
+
+* `0 DELAY` now returns immediately instead of acting like 0x10000 DELAY
+
+* More BLOAD options. A few new extended words when using the new BLOAD.
+
+* No extra spaces in SEE/LIST
+
+* RSEED lets you view/store the random number generation seed
+
+* See rambuild.sh to build a version you can load to RAM at 0 with a ROM at 8000. You can configure in forth.asm for other configurations.
+
+* Restructured BLOAD words
+
+* You can use multiple line colon definitions (see examples/hilomulti.4th). If you are defining a word, the prompt will be :ok instead of ok.
+Note the multiple lines are not stored. You wind up with the same definition either way.
+
+* ^C will abort your input line even in a multi-line definition. Good for when you forget to use a semicolon on a single-line entry.
+ 
+* Improved byte output of SEE/LIST for variables
+
+* Fixed long-standing bug with < and U< that affected ABS, and all comparison operators. NOTE: This may break your scripts and may break some of the examples (will fix)
+
+* Size changes. Errata note about comparison operators
+
+I* MPORTANT: ALLOT now deals with bytes not words! See the word CELLS
+
+* Fixed new regression. 
+
+* New words: ENDIF, CELLS, , (Comma), and C,
+
+* You can add comments by entering a \ which ignores the entire rest of the line. This is useful for
+files you intend to load. Comments are not stored.
+
+* New words: here and ->here
+
+* Force load the high portion of freememory pointers which could have been the source of intermittent issues with larger programs (not true; reverted)
+
+* Bload now happens when you start Forth new automatically
+
+* If you don't want the extra words, issue NEW. You can issue that anytime to wipe out everything to the core words + BASE
+
+* Simple variables get initialized to 0 automatically
+
+* Numbers can always be written as 0#10 or 0xFF (decimal 10 and hex FF).
+
+* SEE now dumps variables in a way that will recreate them if you read it back in.
+
+* SEE always puts 0# or 0x in front of constants so reading a definition in works regardless of mode.
+
+* LIST dumps everything from the user dictionary in a way that it can be read back in later.
+
+* EXEC does an SCRT call to a machine language subroutime (see examples below)
+
+* X. is like . but puts 0x or 0# in front depending on BASE
+
+* If you pass -DNO_BLOAD to the assembler, you get a smaller version with no bload. Bload is still a word but it resolves to the same as LOAD and, presumably, you'll XMODEM whatever extended words you want or paste them in. No need to consume ROM with the words if you are going to load your own anyway!
+[](#ext)
+##  Extended Words Source
+[See extended.inc in source code.](https://github.com/wd5gnr/Elf-RcForth/blob/main/extended.inc)
+
+
+
