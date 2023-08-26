@@ -47,6 +47,7 @@ NN - positive number in current BASE
 -NN - negative decimal number (when BASE=10)
 0xNN - unsigned hex number (any BASE; x is not case sensitive)
 0#nn - unsigned decimal number (any BASE)
+'X' - A single ASCII character pushed on the stack
 
 #### Arithmetic Operators:
 ```
