@@ -1439,8 +1439,8 @@ tokendn:      ldi           T_EOS
 exec:        ldi           low option+1
               plo           r9
               ldn           r9
-              ani           080h 
-              lbz            nodebug
+              xri           080h 
+              lbnz            nodebug
               push          rb
               mov           rf,rb
               mov           r8,debug_hook
@@ -3353,46 +3353,64 @@ f_msg_term:   ldi           0
 ; -----------------------------------------------------------------------------
 ; 'C' style operators for bit shifting, note no range check on number of shifts
 ; -----------------------------------------------------------------------------
-clshift:      call          pop
-              lbdf          error                ; jump if stack was empty
-              glo           rb                   ; move number
-              plo           r7                   ; number of shifts
-              call          pop
-              lbdf          error                ; jump if stack was empty
-              mov           r8,rb                ; value to shift left
-              glo           r7                   ; zero shift is identity
-              bz            shiftret
-; fall through
-lshiftlp:     glo           r8
-              shl                                ; shift lo byte
-              plo           r8
-              ghi           r8
-              shlc                               ; shift hi byte with carry
-              phi           r8
-              dec           r7
-              glo           r7
-              bnz           lshiftlp
-shiftret:    mov           rb,r8
-              lbr           goodpush
-crshift:      call          pop
-              lbdf          error                ; jump if stack was empty
-              glo           rb                   ; move number
-              plo           r7                   ; number of shifts
-              call          pop
-              lbdf          error                ; jump if stack was empty
-              mov           r8,rb
-              glo           r7                   ; zero shift is identity
-              bz            shiftret            ; return with no shift
-; fall through
-rshiftlp:     ghi           r8
-              shr                                ; shift hi byte
-              phi           r8
-              glo           r8
-              shrc                               ; shift lo byte with carry
-              plo           r8
-              dec           r7
-              glo           r7
-              bnz           rshiftlp
+clshift:   sep     scall               ; get value from stack
+           dw      pop
+           lbdf    error               ; jump if stack was empty
+           glo     rb                  ; move number 
+           plo     r7                  ; number of shifts
+
+           sep     scall               ; get next number
+           dw      pop
+           lbdf    error               ; jump if stack was empty
+           mov     r8,rb               ; value to shift left
+
+           glo     r7                  ; zero shift is identity 
+           lbnz    lshiftlp
+           lbr     lshiftret           ; return with no shift
+
+lshiftlp:  glo     r8
+           shl                         ; shift lo byte
+           plo     r8
+           ghi     r8
+           shlc                        ; shift hi byte with carry
+           phi     r8
+           dec     r7
+           glo     r7
+           lbnz    lshiftlp
+
+lshiftret: mov     rb,r8
+	   lbr goodpush
+
+
+crshift:   sep     scall               ; get value from stack
+           dw      pop
+           lbdf    error               ; jump if stack was empty
+           glo     rb                  ; move number 
+           plo     r7                  ; number of shifts
+
+           sep     scall               ; get next number
+           dw      pop
+           lbdf    error               ; jump if stack was empty
+           mov     r8,rb
+
+           glo     r7                  ; zero shift is identity 
+           lbnz    rshiftlp
+           lbr     rshiftret           ; return with no shift
+
+rshiftlp:  ghi     r8
+           shr                         ; shift hi byte
+           phi     r8
+           glo     r8
+           shrc                        ; shift lo byte with carry
+           plo     r8
+           dec     r7
+           glo     r7
+           lbnz    rshiftlp
+   
+rshiftret: mov     rb,r8
+	   lbr goodpush
+
+
 ; delay for approx 1 millisecond on 4MHz 1802
 cdelay:       call          pop
               lbdf          error                ; jump if stack was empty
@@ -3665,23 +3683,23 @@ setupfd:      mov           rd, fildes
 ; **********************************************************
 touc:         ldn           rf                   ; check for quote
               smi           022h
-              bz            touc_qt              ; jump if quote
+              lbz            touc_qt              ; jump if quote
               ldn           rf                   ; get byte from string
-              bz            touc_dn              ; jump if done
+              lbz            touc_dn              ; jump if done
               smi           'a'                  ; check if below lc
-              bnf           touc_nxt             ; jump if so
+              lbnf           touc_nxt             ; jump if so
               smi           27                   ; check upper range
-              bdf           touc_nxt             ; jump if above lc
+              lbdf           touc_nxt             ; jump if above lc
               adi           'A'+27
               str           rf
 touc_nxt:     inc           rf                   ; point to next character
-              br            touc                 ; loop to check rest of string
+              lbr            touc                 ; loop to check rest of string
 touc_dn:      rtn                                ; return to caller
 touc_qt:      inc           rf                   ; move past quote
 touc_qlp:     lda           rf                   ; get next character
               bz            touc_dn              ; exit if terminator found
               smi           022h                 ; check for quote charater
-              bz            touc                 ; back to main loop if quote
+              lbz            touc                 ; back to main loop if quote
               br            touc_qlp             ; otherwise keep looking
 ; [GDJ] type out number according to selected BASE and signed/unsigned flag
 typenumind:
