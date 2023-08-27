@@ -1906,7 +1906,9 @@ culess:       call          pop
               ghi           r7
               sdb                                ; subtract with borrow
               lbr            gooddf
-cwords:       mov           r7, cmdtable
+cwords:       call          f_inmsg
+              db            'CORE:',10,13,0
+              mov           r7, cmdtable
               ldi           0
               phi           rd
               plo           rd
@@ -1931,7 +1933,8 @@ cwordsf:      glo           rb                   ; get byte
               plo           rd
               call          crlfout
               lbr            cwordslp             ; and loop back
-cwordsdn:     call          crlfout
+cwordsdn:     call          f_inmsg
+              db            10,13,'USER:',10,13,0
               mov           r7,storage
               ldi           0
               phi           rd
@@ -3718,8 +3721,14 @@ typenumU:     call          f_uintout   ; since D=re SCRT will preserve either w
 typehex:
               mov           rd,rb
               mov           rf, buffer
+              ldi           low option+1
+              plo           r9
+              ldn           r9
+              ani           4
+              bnz           hex16            ; if option bit 2 set, always do 4 digits
               ghi           rd
-              bz            hexbyte
+              bz            hexbyte          ; otherwise do 2 digits for byte, 4 digits for word
+hex16:        ghi           rd               ; in case we jumped in
               call          f_hexout4
               br            typeout
 hexbyte:      call          f_hexout2

@@ -7,20 +7,20 @@ Last update: 26 Aug 2023
 See [What's New? for news](#new)
 
 ## Contents
-* [What Is It?](#what)
-* [Key Architecctural Items](#key)
-* [Words](#words)
+* [About](#about)
+* [Key Architectural Items](#key-architectural-items)
+* [Words and Syntax](#words-and-syntax)
 * [Notes](#notes)
-* [Tutorial](#tutor)
-* [What's New?](#new)
-* [Extended Word Source](#ext)
+* [Forth Tutorial](#forth-tutorial)
+* [New Items](#new-items)
+* [Extended Words Source](#extended-words-source)
+* [Videos](#videos)
 
-[](#what)
-## What Is It?
+## About
 This is a Forth system for the RCA 1802, popular in the "COSMAC ELF" computers, among other things. It is a bit odd, in consideration of the small hardware, but Mike made some interesting design choices. If you know Forth, you won't find anything too surprising and versions 0.2 up keep eradicating some of the surprising things.
 
 If you don't know Forth, there is a short tutorial from the original readme, below. There's plenty of info on the web, too. 
-[](#key)
+
 ## Key Architectural Items
 * The "compiler" actually converts your input into tokens consisting of core words, numbers, and strings. So your words do not get tokens, they are stored as ASCII strings which has some merits and some difficulties
 * 16-bit integers
@@ -30,8 +30,7 @@ If you don't know Forth, there is a short tutorial from the original readme, bel
 * You can select using the first found definition (faster) or the last found (more like normal Forth)
 * Extended words are loaded from ROM and can be unloaded for space
 
-[](#words)
-## Words
+## Words and Syntax
 
 #### Note on stack representation:
 
@@ -152,7 +151,7 @@ NEW      ( -- )           - Wipe dictionary, stack, and reset RNG (careful! no c
 ```
 #### Extended Functions:
 The extended functions are implemented as pre-loaded Forth programs.  As such they
-can be viewed with the SEE command and removed with the FORGET command. 
+can be viewed with the SEE command and removed with the FORGET command. You can easily remove them during the build to make more room in ROM.
 
 ```
 NIP      (b a -- a)                 - Drop 2nd item from stack
@@ -214,7 +213,6 @@ BYTESWAP (b1b2 -- b2b1)             - Endian conversion for 16 bit int
 FILL     (addr n ch -- )            - Fill n bytes with ch starting at addr
 ERASE    (addr n -- )               - Zero n bytes of memory starting at addr
 CLEAR    ( -- )                     - Clears the stack of all entries
-J        ( -- j )                   - Get loop counter from outer loop
 .S       ( -- )                     - Display entire contents of stack
 TYPE     (addr n -- )               - Display n bytes at addr
 DUMP     (addr n -- )               - Display n bytes at addr as 16 byte records
@@ -226,8 +224,8 @@ BASEOUT  (n b --)                   - Output number n in base b (preserves BASE)
 $.       (n -- )                    - Output number n in hex regardless of BASE
 %.       (n -- )                    - Output number n in binary 
 ```
-[](#notes)
-## Notes:
+
+## Notes
 * OPTION is a variable that controls a few optional things. You treat it like any other variable. Currently:
   - Bit 0 - If set, output commands don't put a space after numbers.  For example, if you have two byte variables and try this normally it will look funny:
   ```
@@ -241,8 +239,10 @@ $.       (n -- )                    - Output number n in hex regardless of BASE
   Note that SEE, LIST, and DUMP all turn this off while running but then put it back the way they found it.
 
   - Bit 1 - By default, any user words are searched for the last word defined. So you can override a word  with a new definition and restore the old definition with a forget or by restoring ->HERE. If bit 1 is set  the search finds the first word which means you can't really override anything -- storing new definitions  just wastes space. The reason this is important, though, is it is much faster. If you were doing a turnkey  deployment and want better performance and don't plan to override words, you can set this bit in your init   and enjoy faster performance.
+  - Bit 2 - When set, writing a hex number out is always 4 digits. By default, values<=255 use two digits and larger numbers use 4 digits.
   - Bit 6 - This requests a turn off of debug/trace mode (see bit 7)
   - Bit 7 - If bit 7 is set AND you have a defined word of dbg-hook, that word will run before each execution step and gets the address on the stack. You must clean up the stack or bad things will happen. See debug.4th in the examples directory. This is currently largely untested.
+  
 
 * BLOAD has changed by default, but you can put it back or remove it. 
 The previous state was BLOAD loaded a binary blob that included address and all the state variables. So it wipes out everything
@@ -335,9 +335,27 @@ PGM 0x7A c, 0x7B c, 0xD5 CSTORE
 ```
 Previous code that used word-sized ALLOT will break
 
+C, probably needs some work. Right now it adds 1 byte to the allocation and stores things in the previous byte.
+This is similar to how , works (adds 2 and uses the first 2). However, for a byte, that means the first byte is
+missed. In other words:
+
+```
+VARIABLE FOO 10 c, 20 c, 30 c,
+```
+Produces FOO[0]=? FOO[1]=10, FOO[2]=20, FOO[30=30. This could be a problem if that was machine language code. 
+```
+FOO EXEC
+```
+
+Will be unpredictable. You should exec FOO 1+. You can also treat the first byte special:
+```
+VARIABLE FOO FOO 10 c! 20 c, 30 c, 
+```
+
+
 * Comments and line breaks are not stored
-[](#tutor)
-## Forth Tutorial:
+
+## Forth Tutorial
 
 Forth is primarily a stack based language.  Arguments for functions are first
 pushed onto the stack and then the instruction is executed.  Pushing a number
@@ -656,9 +674,7 @@ This completes this introductory tutorial on Forth.  Experiment with the
 commands and you will find it is really easy to pick it up!
 
 
-[](#new)
-
-## What's New?
+## New Items
 
 * Moved gotoxy to extended words so it can be easily removed.
 
@@ -757,9 +773,20 @@ files you intend to load. Comments are not stored.
 * X. is like . but puts 0x or 0# in front depending on BASE
 
 * If you pass -DNO_BLOAD to the assembler, you get a smaller version with no bload. Bload is still a word but it resolves to the same as LOAD and, presumably, you'll XMODEM whatever extended words you want or paste them in. No need to consume ROM with the words if you are going to load your own anyway!
-[](#ext)
+
 ##  Extended Words Source
 [See extended.inc in source code.](https://github.com/wd5gnr/Elf-RcForth/blob/main/extended.inc)
 
+## Videos
+Note: Many of these videos do not reflect the latest version.
 
+### Basic usage
+[![Video](https://img.youtube.com/vi/4dpurVkODOM/0.jpg)](https://www.youtube.com/watch?v=4dpurVkODOM)
 
+### Saving and Loading
+
+[![Video](https://img.youtube.com/vi/mMSmbIc4vXw/0.jpg)](https://www.youtube.com/watch?v=mMSmbIc4vXw)
+
+### Serial Terminal Tips for Linux
+
+[![Video](https://img.youtube.com/vi/vmDcZAw7Ywc/0.jpg)](https://www.youtube.com/watch?v=vmDcZAw7Ywc)
