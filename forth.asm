@@ -314,8 +314,15 @@ FRPAT:        equ           FRSEED+1
 FOPAREN:      equ           FRPAT+1
 FOPT:         equ           FOPAREN+1
 FDOTTOK:      equ           FOPT+1
+FRPEXCL:      equ           FDOTTOK+1
+FRP0:         equ           FRPEXCL+1
+FSP0:         equ           FRP0+1
+FSPEXCL:      equ           FSP0+1
+FAPOS:        equ           FSPEXCL+1
+FEXECUTE:     equ           FAPOS+1
+FTIB:         equ           FEXECUTE+1
 ; End of list, if adding, update LAST_TOK, below
-LAST_TOK:    equ           FDOTTOK              ; don't forget to change this when adding more tokens      
+LAST_TOK:    equ           FTIB              ; don't forget to change this when adding more tokens      
 ; special tokens
 T_EOS:        equ           253                  ; end of command line
 T_NUM:        equ           255
@@ -1744,12 +1751,7 @@ cdoerr:       lbdf          error                ; jump if stack was empty
               call          pop
               lbdf          error               ; jump if stack was empty
               mov           r8,rb
-              mov           ra,r2
-              inc           ra                   ; pointing at R[6] value high
-              lda           ra                   ; get high of R[6]
-              phi           rb                   ; put into r6
-              lda           ra
-              plo           rb
+              call          getstream
               call          rpush                ; store inst point on return stack
 goodrpush78b:
               mov           rb,r8                ; termination to rb
@@ -1804,12 +1806,8 @@ errorl0:      lbdf          error
               adc
               phi           rb
               lbr            loopcnt              ; then standard loop code
-cbegin:       mov           ra,r2
-              inc           ra                   ; pointing at ra value high
-              lda           ra                   ; get high of ra
-              phi           rb                   ; put into rb
-              lda           ra
-              lbr            goodrpushb0
+cbegin:       call           getstream 
+              lbr            goodrpush
 ; [GDJ] corrected logic - BEGIN/UNTIL loop should repeat if flag preceding UNTIL is FALSE
 cuntil:       call          pop                  ; get top of stack
               lbdf          error                ; jump if stack was empty
@@ -1989,12 +1987,7 @@ cwhile:       call          pop
               bnz           whileno              ; jump if not zero
               ghi           rb                   ; check high byte
               bnz           whileno
-              mov           ra,r2
-              inc           ra                   ; point to R[6]
-              lda           ra                   ; get command stream
-              phi           rb                   ; put into r6
-              ldn           ra
-              plo           rb
+              call          getstream
               ldi           0                    ; set while count to zero
               plo           r7
 findrep:      ldn           rb                   ; get byte from stream
@@ -2017,12 +2010,7 @@ fndrep:       inc           rb                   ; move past the while
               ghi           rb
               str           ra
               lbr           good                 ; then return to caller
-whileno:      mov           ra,r2
-              inc           ra                   ; now pointing to high byte of R[6]
-              lda           ra                   ; get it
-              phi           rb                   ; and put into r6
-              ldn           ra                   ; get low byte
-              plo           rb
+whileno:      call          getstream
               dec           rb                   ; point back to while command
               lbr           goodrpush
 crepeat:      call          rpop                 ; get address on return stack
@@ -2040,12 +2028,7 @@ cif:          call          pop
               lbnz          good                 ; jump if not zero
               ghi           rb                   ; check hi byte too
               lbnz          good                 ; jump if not zero
-              mov           ra,r2
-              inc           ra                   ; now pointing at R[6]
-              lda           ra                   ; get R[6]
-              phi           rb
-              ldn           ra
-              plo           rb
+              call          getstream
               ldi           0                    ; set IF count
               plo           r7                   ; put into counter
 iflp1:        ldn           rb                   ; get next byte
@@ -2073,12 +2056,7 @@ ifnotelse:    ldn           rb                   ; retrieve byte
               dec           r7                   ; decrement if count
               lbnz           ifcnt                ; jump if not zero
               br            ifsave               ; otherwise found
-celse:        mov           ra,r2
-              inc           ra                   ; now pointing at R[6]
-              lda           ra                   ; get current R[6]
-              phi           rb                   ; and place into r6
-              ldn           ra
-              plo           rb
+celse:        call          getstream
               ldi           0                    ; count of IFs
               plo           r7                   ; put into R7
 elselp1:      ldn           rb                   ; get next byte from stream
@@ -2228,12 +2206,7 @@ ccerr:        lbdf          error                ; jump on error
 cvariable:    
 #idef USE_CBUFFER
 ; easier.. we just copy the FVARIABLE FASCII String and then bump up two bytes and go
-              mov           ra,r2
-              inc           ra                   ; point to R[6]
-              lda           ra                   ; and retrieve it
-              phi           rb
-              ldn           ra
-              plo           rb                   ; RB=Pointer to input bytestream
+              call          getstream
               ldn           rb                   ; get next byte
               smi           T_ASCII              ; it must be an ascii mark
               lbnz          error                ; jump if not
@@ -2366,12 +2339,7 @@ varlp1:       ldn           rb                   ; get byte
 ccolon:
 #ifdef USE_CBUFFER
 ; almost the same excep we copy cbuffer to free mem and we have to update within cbuffer not within
-              mov           ra,r2
-              inc           ra                   ; point to R[6]
-              lda           ra                   ; and retrieve it
-              phi           rb
-              ldn           ra
-              plo           rb
+              call         getstream
 ; we have to copy from CBUFFER to  either FSEMI or T_EOS NOTE: T_NUM MIGHT HAVE A T_EOS or FSEMI in it!
               ldi          low freemem
               plo          r9
@@ -2508,12 +2476,7 @@ colonnend:
               ldi           0c0h
               str           r9                   ; mark back to normal
 #else
-              mov           ra,r2
-              inc           ra                   ; point to R[6]
-              lda           ra                   ; and retrieve it
-              phi           rb
-              ldn           ra
-              plo           rb
+              call          getstream
               call          ismulti
               bnz           colonlp1             ; multiline, just keep it going
               ldn           rb                   ; get next byte
@@ -2888,11 +2851,11 @@ seenotn:      mov           rb,cmdtable
               plo           r8                   ; token counter
 seenotnlp:    dec           r8                   ; decrement count
               glo           r8                   ; get count
-              bz            seetoken             ; found the token
+              lbz            seetoken             ; found the token
 seelp3:       lda           rb                   ; get byte from token
               ani           128                  ; was it last one?
-              bnz           seenotnlp            ; jump if it was
-              br            seelp3               ; keep looking
+              lbnz           seenotnlp            ; jump if it was
+              lbr            seelp3               ; keep looking
 seetoken:     ldn           rb                   ; get byte from token
               ani           128                  ; is it last
               bnz           seetklast            ; jump if so
@@ -3119,7 +3082,7 @@ forgetlp1:    lda           rb                   ; get pointer
               smb
               str           rb
               mov           rb,ra
-              br            forgetlp1            ; loop until done
+              lbr            forgetlp1            ; loop until done
 forgetd1:     lda           r7                   ; get next entry
               phi           rb
               ldn           r7
@@ -3189,9 +3152,40 @@ ismulti:    ldi   low jump
             xri   0c0h    ; returns non-zero if we ARE in multi mode
             rtn
 
+crpexcl:      call          pop
+              lbdf          error
+              ldi           low rstack
+pexcl:        plo           r9
+              ghi           rb
+              str           r9
+              inc           r9
+              glo           rb
+              str           r9
+              lbr            good
 
+cspexcl       call          pop       
+              lbdf          error
+              ldi           low fstack
+              br            pexcl 
 
-; [GDJ]
+crp0:         call          getvar
+              db            low himem
+              ghi           ra 
+              smi           1
+rsp0:
+              phi           rb
+              glo           ra
+              plo           rb
+              lbr           goodpush
+
+csp0:         call          getvar
+              db            low himem
+              ghi           ra
+              smi           2
+              br            rsp0             
+ctib:         mov           rb,buffer
+              lbr           goodpush
+
 cspat:        mov           r8,fstack            ; get stack address pointer
               ; get stack address
 addat:              
@@ -3913,8 +3907,124 @@ cdottok:      call         pop
               lbr          good
 
             
+; get current stream pointer into rb
+getstream:    mov           ra,r2
+              inc           ra    ; move to top of stack
+              inc           ra    ; skip our return address (2 bytes)
+              inc           ra
+              lda           ra
+              phi           rb
+              ldn           ra
+              plo           rb
+              rtn
 
+capos:        call          getstream
+              ldn           rb
+              smi           T_NUM
+              lbz           error
+              ldn           rb
+              smi           T_ASCII
+              bz            aposstr
+              ldn           rb
+              ani           80h 
+              lbz           error         ; what?
+; here we have a token
+              lda           rb
+              plo           re
+              glo           rb         ; reset return address
+              str           ra
+              dec           ra
+              ghi           rb
+              str           ra          ; reset address
+              mov           ra,cmdvecs
+              dec           re
+              glo           re
+              ani           07fh
+              shl
+              str           r2
+              glo           ra
+              add
+              plo           rb
+              ghi           ra
+              adci          0
+              phi           rb
+              lbr           goodpush
 
+aposstr:      inc           rb
+              mov           r8,rb
+              call          findname
+              lbdf          error
+              call          push
+              mov           ra,r2
+              inc           ra
+              ghi           r8
+              str           ra
+              inc           ra
+              glo           r8
+              str           ra
+              lbr           good
+
+cexecute:     call          pop
+              lbdf          error
+              ; if rb>himem we have a token to execute
+              call          getvar
+              db            himem
+              ghi           ra
+              str           r2
+              ghi           rb
+              sm
+              bnf           estring  ; if hipart of address >himem high part (usual case) must be core word
+         ; no point in checking low part so...
+              ; exec token pointed to by RB
+              mov          rf,rb
+              ldi          high cmdvecs
+              str          r2
+              ghi          rb
+              sm
+              phi          rb
+              ldi          low cmdvecs
+              str          r2
+              glo          rb
+              smb
+              shr
+              plo          rb
+
+              ldi           0
+              stxd
+              glo           rb
+              ori           80h
+              adi           1
+              stxd
+              mov           rb,r2
+              inc           rb
+              glo          rb
+              stxd
+              ghi          rb
+              stxd
+              call         exec
+              irx
+              ldxa
+              phi          rb
+              ldx
+              plo          rb
+; eat the token
+              irx
+              irx
+              lbr          good
+
+estring:
+              ; otherwise we execute a string
+              glo           rb
+              stxd
+              ghi           rb
+              stxd
+              call          exec
+              irx
+              ldxa
+              phi           rb
+              ldx
+              plo           rb
+              lbr           good              
 
 hello:        db            'Rc/Forth 0.5',0
 aprompt:      db            ':'                  ; no zero, adds to prompt (must be right before prompt)
@@ -4002,8 +4112,15 @@ cmdtable:     db            'WHIL',('E'+80h)
               db            'RSEE',('D'+80h)
               db            'RP',('@'+80h)
               db            ('('+80h)
-              db            'OP'+(80h+'T')
-              db            '.TO'+(80h+'K')
+              db            'OP',(80h+'T')
+              db            '.TO',(80h+'K')
+              db            'RP',(80h+'!')
+              db            'RP',(80h+'0')
+              db            'SP',(80h+'0')
+              db            'SP',(80h+'!')
+              db            (80h+27h)             ; ' command
+              db            'EXECUT',(80h+'E')
+              db            'TI',(80h+'B')
               db            0                    ; no more tokens
 cmdvecs:      dw            cwhile               ; 81h
               dw            crepeat              ; 82h
@@ -4091,6 +4208,13 @@ cmdvecs:      dw            cwhile               ; 81h
               dw            0             ; no handler for ( comment )
               dw            copt  
               dw            cdottok
+              dw            crpexcl
+              dw            crp0
+              dw            csp0
+              dw            cspexcl
+              dw            capos
+              dw            cexecute
+              dw            ctib
 
 
 #ifdef        STGROM

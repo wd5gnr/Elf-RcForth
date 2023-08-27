@@ -3,7 +3,7 @@
  ## with additions by Al Williams and Glenn Jolly
 
 ## Version 0.5
-Last update: 26 Aug 2023
+Last update: 27 Aug 2023
 See [What's New? for news](#new)
 
 ## Contents
@@ -80,6 +80,8 @@ ENDIF    ( -- )           - Same as THEN
 >R       (a -- )          - Move top of data stack to return stack
 R>       ( -- a)          - Move top of return stack to data stack
 R@       ( -- a)          - Copy top of return stack to data stack
+'        ( -- xt)         - Get execution token for next word (ex: ' + )
+EXECUTE  (xt -- )         - Execute xt (see ')
 ```
 
 #### Variables:
@@ -88,6 +90,10 @@ VARIABLE name                   - Create a variable (not allowed in functions)
 @        (a -- v)               - Retrieve value from address
 SP@      ( -- a)                - Get address of tos pointer
 RP@      ( -- a)                - Get address of return stack
+SP0      ( -- a)                - Default stack address
+RP0      ( -- a)                - Default return stack address
+SP!      ( a -- )               - Set stack pointer (careful)
+RP!      ( a -- )               - Set return stack pointer (careful)
 !        (v a -- )              - Store value at address
 C@       (a -- v)               - Retrieve byte value from address
 C!       (v a -- )              - Store byte value at address
@@ -96,6 +102,7 @@ CMOVE    (caddr1 caddr2 u -- )  - Move u bytes from caddr1 to caddr2
 HERE     ( -- a)                - Retrieve the current free memory pointer
 ->HERE   (a -- )                - Set the current free memory pointer (dangerous!)
 OPT      ( -- a)                - Address of option variable (bit 0=supress space after numeric output; 1=find first word in dictionary)
+TIB      ( -- a)                - Address of input buffer
 ```
 
 #### Function definition:
@@ -675,6 +682,12 @@ commands and you will find it is really easy to pick it up!
 
 
 ## New Items
+
+* If you define LEAN_EXTENDED (in extended.inc) you get a smaller number of extended words to save ROM space. You can load the rest later as you desire.
+
+* Finally have ' and EXECUTE that work for core or extended word (but not variables).
+
+* Unstable debug interface (see example directory)
 
 * Moved gotoxy to extended words so it can be easily removed.
 
