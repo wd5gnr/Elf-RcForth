@@ -2,7 +2,7 @@
 ; Define LEAN_EXTENDED if you only want what I think are
 ; "important" extended words You can always load the rest as you see
 ; fit at runtime
-#define LEAN_EXTENDED
+
 
 ; rules: All uppercase
 ; no multiple line definitions
@@ -10,9 +10,7 @@
 ; Sometimes (but not always) RC/ASM stops after a double quote
 ; So '." foo " .',0  -- might stop after the quote. Check the listing to be sure
 
-  db '." Wait..."CR',0
-
-; You can put ASCII definitions/command here 
+  ; You can put ASCII definitions/command here 
 ; But you can also use the Fxxx words for core words.
 ; So...
 ; db ': foo swap drop ;',0
@@ -25,50 +23,7 @@
 ; You can also use T_NUM:  db T_NUM,0,0ffh   ; 255
 ; or T_ASCII: db FCOLON,T_ASCII,'FOO',0,....
 
-; If you want uncompressed tokens, replace this file with extended-text.inc
-
-
-  db FCOLON,'.S',FOPT,FAT,FDUP,FGTR,'1',FOR,FOPT,FEXCL,'." <"',FDEPTH,FDOT
-  db        '." > "0',FOPT,FEXCL,FDEPTH,'?DUP',FIF,FDUP,'0',FDO,FDUP,FI,FMINUS,'PICK',FDOT,FLOOP,FDROP,FTHEN,FRGT,FOPT,FEXCL,FSEMI,0
-  db FCOLON,'?',FAT,FUDOT,FSEMI,0
-  db FCOLON,'?DUP',FDUP,FIF,FDUP,FTHEN,FSEMI,0
-  db FCOLON,'BL 0X20 ;',0
-  db FCOLON,'BS 8',FEMIT,FSEMI,0
-  db FCOLON,'CELLS 2*',FSEMI,0
-  db FCOLON,'CLEAR',FDEPTH,FWHILE,FDROP,FDEPTH,FREPEAT,FSEMI,0
-  db FCOLON,'C,',FHERE,'1',FALLOT,'1-',FCEXCL,FSEMI,0
-  db FCOLON,'CLS ESC ." [2J"ESC ." [H"'
-  db FSEMI,0
-  db FCOLON,'DUMP',FOPT,FAT,FGTR,'0',FOPT,FEXCL,FCR,'5 SPACES',T_NUM,0,10h,'0',FDO,FI,FDOT,FLOOP,'0',FDO,FCR,FDUP,FDOT,T_NUM,0,10h
-  db        '0',FDO,FDUP,FCAT,FDOT,'1+',FLOOP,FDUP,T_NUM,0,10h,FMINUS,T_NUM,0,10h,'TYPE',T_NUM,0,10h,FPLOOP,FDROP,FCR,FRGT,FOPT,FEXCL,FSEMI,0
-  db FCOLON,'ESC 0X1B',FEMIT,FSEMI,0
-  db FCOLON,'FALSE 0',FSEMI,0
-  db FCOLON,'FREE ',FMEM,FUDOT,FCR,FSEMI,0
-  db FCOLON,'NIP',FSWAP,FDROP,FSEMI,0
-  db FCOLON,'NOT 0=',FSEMI,0
-  db FCOLON,'PICK 2 * 2+',FSPAT,FPLUS,FAT,FSEMI,0
-  db FCOLON,'>',FSWAP,FLESS,FSEMI,0
-  db FCOLON,'>= < NOT',FSEMI,0
-  db FCOLON,'<= > NOT',FSEMI,0
-  db FCOLON,',',FHERE,'2',FALLOT,'2-',FEXCL,FSEMI,0
-  db FCOLON,'0< 0 <',FSEMI,0
-  db FCOLON,'0> 0 >',FSEMI,0
-  db FCOLON,'0= 0 =',FSEMI,0
-  db FCOLON,'0= 0 =',FSEMI,0
-  db FCOLON,'1+ 1 +',FSEMI,0
-  db FCOLON,'1- 1 -',FSEMI,0
-  db FCOLON,'2+ 2 +',FSEMI,0
-  db FCOLON,'2- 2 -',FSEMI,0
-  db FCOLON,'MOD',FDUP,FROT,FDUP,FROT,FDIV,FROT,FMUL,FMINUS,FSEMI,0
-  db FCOLON,'NEG 0',FSWAP,FMINUS,FSEMI,0
-  db FCOLON,'SPACE',T_NUM,0,20h,FEMIT,FSEMI,0
-  db FCOLON,'SPACES 0',FDO,T_NUM,0,20h,FEMIT,FLOOP,FSEMI,0
-  db FCOLON,'TRUE 1',FSEMI,0
-  db FCOLON,'TUCK',FSWAP,FOVER,FSEMI,0
-  db FCOLON,'TYPE',FDUP,FIF,'0',FDO,FDUP,FCAT,FEMITP,'1+',FLOOP,FELSE,FDROP,FTHEN,FDROP,FSEMI,0
-  db FCOLON,'U>',FSWAP,'U<',FSEMI,0
-  db FCOLON,'U>= 2DUP U> >R = R> OR',FSEMI,0
-  db FCOLON,'U<= U>= NOT',FSEMI,0
+  
 
 ; of course, it is easy enough to move stuff from one list to the other
 #ifndef LEAN_EXTENDED
@@ -109,8 +64,6 @@
   db FCOLON,'%.',T_NUM,80h,00,FBEGIN,'2DUP',FAND,FIF,T_NUM,0,31h,FELSE,T_NUM,0,30h
   db         FTHEN,FEMIT,'1 ',FGTGT,FDUP,'NOT',FUNTIL,'SPACE',FDROP,FDROP,FSEMI,0
 #endif
-  include custom.inc
-  db '." Ext words loaded"CR',0
-  db 'INIT',0
+
   db  0
 

@@ -3,7 +3,7 @@
  ## with additions by Al Williams and Glenn Jolly
 
 ## Version 0.5
-Last update: 27 Aug 2023
+Last update: 28 Aug 2023
 See [What's New? for news](#new)
 
 ## Contents
@@ -67,6 +67,7 @@ U<       (u1 u2 -- ?)     - Return 1 if u1 < u2 else 0 (unsigned)
 ```
 BEGIN    ( -- )           - Beginning of BEGIN-UNTIL loop
 UNTIL    (B -- )          - Ending of BEGIN-UNTIL loop
+AGAIN    ( -- )           - End of an endless BEGIN loop (see EXIT, etc.)
 WHILE    (B -- )          - Beginning of while-repeat loop
 REPEAT   ( -- )           - End of while-repeat loop
 DO       (T S -- )        - Start of DO LOOP
@@ -80,8 +81,11 @@ ENDIF    ( -- )           - Same as THEN
 >R       (a -- )          - Move top of data stack to return stack
 R>       ( -- a)          - Move top of return stack to data stack
 R@       ( -- a)          - Copy top of return stack to data stack
-[']        ( -- xt)         - Get execution token for next word (ex: ' + )
+[']        ( -- xt)       - Get execution token for next word (ex: ' + )
 EXECUTE  (xt -- )         - Execute xt (see ')
+EXIT     ( -- )           - Exit current word (see UNLOOP and UNBEGIN)
+UNLOOP   ( -- )           - Remove one level of loop before an EXIT
+QUIT     ( -- )           - Back to top level (no prompt)
 ```
 
 #### Variables:
@@ -128,7 +132,8 @@ EMITP    (a -- )          - print top of stack as printable character
 
 #### Others:
 ```
-\                         - Comment from here to end of line (needs space after it; not \comment but \ comment)CR       ( -- )           - Print a CR/LF pair
+\                         - Comment from here to end of line (needs space after it; not \comment but \ comment)
+CR       ( -- )           - Print a CR/LF pair
 MEM      ( -- a)          - return amount of memory
 WORDS    ( -- )           - Display vocabulary words
 SEE name                  - See what is bound to a name
@@ -140,12 +145,10 @@ KEY?     ( -- ?)          - Non blocking keyboard read returns 1 if pressed else
 SETQ     (n -- )          - Set Q line hi/lo for n 1/0 
 BASE     ( -- addr)       - Address containing the current numeric radix
 RSEED    ( -- addr)       - Address of 32-bit random number seed
-DECIMAL  ( -- )           - Set the numeric radix to 10 (takes effect next input line)
-HEX      ( -- )           - Set the numeric radix to 16 (takes effect next input line)
 DELAY    (n --)           - Blocking delay of n milliseconds
 SAVE     ( -- )           - Save dictionary to terminal via Xmodem
 LOAD     ( -- )           - Load dictionary to terminal via Xmodem
-BLOAD    ( -- )           - Load extensions as binary block included in src code (note: resets to decimal before loading and leaves you in decimal mode) This happens automatically. If you don't want these functions, use NEW (see below).
+BLOAD    ( -- )           - Load extended words
 RAND     ( -- b)          - Returns random byte
 EXEC     ( a -- r )       - Do an SCRT call to machine language at address a; Value of RB on return pushed on stack
 OUT      ( b p -- )       - Output byte b to port p (e.g., 4 0xaa out)
@@ -154,29 +157,27 @@ EF       ( -- v )         - Read value of EF pins
 SETQ     ( x -- )         - Set q to value x
 BYE      ( -- )           - Exit
 NEW      ( -- )           - Wipe dictionary, stack, and reset RNG (careful! no confirmation!)
-.TOK     (t -- )          - Prints name of token T and CR (T must be between 0x80 and to last token; unpredictable if out of range). Mainly to support debuggin.
+.TOK     (t -- )          - Prints name of token T and CR (T must be between 0x80 and to last token; unpredictable if out of range). Mainly to support debugging.
+QUERY    ( a -- )         - Reads line of text to buffer at address a (255 bytes max)
 ```
 #### Extended Functions:
 The extended functions are implemented as pre-loaded Forth programs.  As such they
-can be viewed with the SEE command and removed with the FORGET command. You can easily remove them during the build to make more room in ROM.
+can be viewed with the SEE command and removed with the FORGET command. You can easily remove them during the build to make more room in ROM. There are two sets of extended functions. The CORE is always loaded. The extended words are loaded if present but do not surive a new. You can reload them with the BLOAD command. You can remove the second set by defining LEAN_EXTENDED. (Note: this part of the document may be slightly out of date). You can also add custom words to custom.inc or change the core and extended words by editing extcore.inc, extended.inc, and custom.inc. 
 
+##### Core extended:
 ```
+DECIMAL  ( -- )                     - Set the numeric radix to 10 (takes effect next input line)
+HEX      ( -- )                     - Set the numeric radix to 16 (takes effect next input line)
 NIP      (b a -- a)                 - Drop 2nd item from stack
 TUCK     (b a -- a b a)             - Place copy of TOS before 2nd on stack
 PICK     (an..a0 k -- an..a0 ak)    - Copy k-th stack element to stack
-2DUP     (b a -- b a b a)           - Duplicate top 2 stack values
-2DROP    (a b -- )                  - Drop top 2 stack values
-2OVER    (a b c d -- a b c d a b)   - Duplicate bottom pair a b to stack
-2SWAP    (a b c d -- c d a b)       - Exchange the top two cell pairs
 TRUE     ( -- 1)                    - Place true value on stack
 FALSE    ( -- 0)                    - Place false value on stack
-J        (R:loop ndx -- loop ndx)   - Copy of loop index from return stack
 1+       (v -- v)                   - Add 1 to the top of stack
 1-       (v -- v)                   - Subtract 1 from the top of stack
 2+       (v -- v)                   - Add 2 to the top of stack
 2-       (v -- v)                   - Subtract 2 from the top of stack
 0=       (v -- v)                   - Returns 1 if TOS is zero, otherwise 0
-GOTOXY   (x y -- )                  - Position VT100 cursor at x,y (works even in hex mode)
 NOT      (v -- v)                   - Return 0 if TOS <> 0, otherwise 1
 U>       (u1 u2 -- ?)               - flag true if u1 is greater than u2
 U>=      (u1 u2 -- ?)               - flag true if u1 is greater than or equal to u2
@@ -187,6 +188,30 @@ U<=      (u1 u2 -- ?)               - flag true if u1 is less than or equal to u
 0>       (v -- v)                   - Return 1 if TOS > 0 else 0
 0<       (v -- v)                   - Return 1 if TOS < 0 else 0
 FREE     ( -- )                     - Display free memory
+?        (a -- )                    - Display value at address
+NEG      (v -- v)                   - Negate a number
+?DUP     (a -- a | a a)             - Duplicate TOS if nonzero
+BL       ( -- 32)                   - Place a blank on the stack
+SPACE    ( -- )                     - Display a single space
+SPACES   (v -- )                    - Display specified number of spaces
+CLS      ( -- )                     - Clear screen
+MOD      (a b -- v)                 - Get remainder of a/b
+CLEAR    ( -- )                     - Clears the stack of all entries
+.S       ( -- )                     - Display entire contents of stack
+TYPE     (addr n -- )               - Display n bytes at addr
+DUMP     (addr n -- )               - Display n bytes at addr as 16 byte records
+CELLS    (n -- 2n)                  - Converts array index into byte offset
+,        (d -- )                    - Use after array definition; see notes
+c,       (b -- )                    - Use after array definition; see notes
+```
+##### Optional extended:
+```
+2DUP     (b a -- b a b a)           - Duplicate top 2 stack values
+2DROP    (a b -- )                  - Drop top 2 stack values
+2OVER    (a b c d -- a b c d a b)   - Duplicate bottom pair a b to stack
+2SWAP    (a b c d -- c d a b)       - Exchange the top two cell pairs
+J        (R:loop ndx -- loop ndx)   - Copy of loop index from return stack
+GOTOXY   (x y -- )                  - Position VT100 cursor at x,y (works even in hex mode)
 +!       (v a -- )                  - Add value to specified variable address
 -!       (v a -- )                  - Subtract value from specified variable address
 *!       (v a -- )                  - Multiply specified variable address by value
@@ -194,23 +219,15 @@ FREE     ( -- )                     - Display free memory
 C+!      (n caddr -- n+)            - Adds n to value stored at caddr
 C-!      (n caddr -- n-)            - Subtracts n from value stored at caddr 
 @+       (a -- a v)                 - Like @ except preserve address incremented by 2
-?        (a -- )                    - Display value at address
-NEG      (v -- v)                   - Negate a number
 MIN      (a b -- v)                 - Return smallest of 2 signed numbers
 MAX      (a b -- v)                 - Return largest of 2 signed numbers
 UMIN     (u1 u2 -- v)               - Return smallest of 2 unsigned numbers
 UMAX     (u1 u2 -- v)               - Return largest of 2 unsigned numbers
-?DUP     (a -- a | a a)             - Duplicate TOS if nonzero
 ABS      (v -- v)                   - Return absolute value of a number
-BL       ( -- 32)                   - Place a blank on the stack
-SPACE    ( -- )                     - Display a single space
-SPACES   (v -- )                    - Display specified number of spaces
-CLS      ( -- )                     - Clear screen
 LSHIFT   (v c -- )                  - Left shift value v by c bits (signed)
 RSHIFT   (v c -- )                  - Right shift value v by c bits (signed)
 INVERT   (a -- v)                   - Invert the bits of TOS
 SGN      (v -- v)                   - Return sign of number
-MOD      (a b -- v)                 - Get remainder of a/b
 /MOD     (a b -- r q)               - Perform both mod and functions
 GETBIT   (u n -- ?)                 - Get state of nth bit (0..15) of u as flag
 SETBIT   (u n -- u)                 - Set nth bit of u
@@ -219,13 +236,6 @@ TGLBIT   (u n -- u)                 - Toggle nth bit of u
 BYTESWAP (b1b2 -- b2b1)             - Endian conversion for 16 bit int
 FILL     (addr n ch -- )            - Fill n bytes with ch starting at addr
 ERASE    (addr n -- )               - Zero n bytes of memory starting at addr
-CLEAR    ( -- )                     - Clears the stack of all entries
-.S       ( -- )                     - Display entire contents of stack
-TYPE     (addr n -- )               - Display n bytes at addr
-DUMP     (addr n -- )               - Display n bytes at addr as 16 byte records
-CELLS    (n -- 2n)                  - Converts array index into byte offset
-,        (d -- )                    - Use after array definition; see notes
-c,       (b -- )                    - Use after array definition; see notes
 BASEOUT  (n b --)                   - Output number n in base b (preserves BASE)
 #.       (n -- )                    - Output number n in decimal regardless of BASE
 $.       (n -- )                    - Output number n in hex regardless of BASE
@@ -683,6 +693,8 @@ commands and you will find it is really easy to pick it up!
 
 ## New Items
 
+* UNLOOP and UNBEGIN and EXIT -- you need to UNLOOP or UNBEGIN as many levels as you are deep before doing an EXIT
+  
 * If you define LEAN_EXTENDED (in extended.inc) you get a smaller number of extended words to save ROM space. You can load the rest later as you desire.
 
 * Finally have ['] and EXECUTE that work for core or extended word (but not variables).
