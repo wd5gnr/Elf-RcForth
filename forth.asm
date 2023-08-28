@@ -321,8 +321,9 @@ FSPEXCL:      equ           FSP0+1
 FAPOS:        equ           FSPEXCL+1
 FEXECUTE:     equ           FAPOS+1
 FTIB:         equ           FEXECUTE+1
+FQUERY:       equ           FTIB+1
 ; End of list, if adding, update LAST_TOK, below
-LAST_TOK:    equ           FTIB              ; don't forget to change this when adding more tokens      
+LAST_TOK:    equ           FQUERY              ; don't forget to change this when adding more tokens      
 ; special tokens
 T_EOS:        equ           253                  ; end of command line
 T_NUM:        equ           255
@@ -1802,7 +1803,7 @@ errorl0:      lbdf          error
               add
               plo           rb
               ghi           rb
-              irx
+              irx 
               adc
               phi           rb
               lbr            loopcnt              ; then standard loop code
@@ -3906,7 +3907,18 @@ cdottok:      call         pop
               irx
               lbr          good
 
-            
+cquery:
+            call            pop
+            lbdf            error
+            mov             rf,rb
+            call            f_input
+            bnf           qgood
+            mov            rf,rb
+            ldi            0
+            str            rf
+qgood:      lbr             good
+
+
 ; get current stream pointer into rb
 getstream:    mov           ra,r2
               inc           ra    ; move to top of stack
@@ -4118,9 +4130,10 @@ cmdtable:     db            'WHIL',('E'+80h)
               db            'RP',(80h+'0')
               db            'SP',(80h+'0')
               db            'SP',(80h+'!')
-              db            (80h+27h)             ; ' command
+              db            '[',27h,(80h+']')             ; ['] command
               db            'EXECUT',(80h+'E')
               db            'TI',(80h+'B')
+              db            'QUER',(80h+'Y')
               db            0                    ; no more tokens
 cmdvecs:      dw            cwhile               ; 81h
               dw            crepeat              ; 82h
@@ -4215,6 +4228,7 @@ cmdvecs:      dw            cwhile               ; 81h
               dw            capos
               dw            cexecute
               dw            ctib
+              dw            cquery
 
 
 #ifdef        STGROM

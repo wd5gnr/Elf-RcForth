@@ -80,7 +80,7 @@ ENDIF    ( -- )           - Same as THEN
 >R       (a -- )          - Move top of data stack to return stack
 R>       ( -- a)          - Move top of return stack to data stack
 R@       ( -- a)          - Copy top of return stack to data stack
-'        ( -- xt)         - Get execution token for next word (ex: ' + )
+[']        ( -- xt)         - Get execution token for next word (ex: ' + )
 EXECUTE  (xt -- )         - Execute xt (see ')
 ```
 
@@ -685,7 +685,7 @@ commands and you will find it is really easy to pick it up!
 
 * If you define LEAN_EXTENDED (in extended.inc) you get a smaller number of extended words to save ROM space. You can load the rest later as you desire.
 
-* Finally have ' and EXECUTE that work for core or extended word (but not variables).
+* Finally have ['] and EXECUTE that work for core or extended word (but not variables).
 
 * Unstable debug interface (see example directory)
 
