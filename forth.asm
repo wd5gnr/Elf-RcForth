@@ -1140,12 +1140,12 @@ tdotqtdn:     ldi           0                    ; need string terminator
 notoken:                                         ; get number BASE [GDJ]
               mov           rc,rb
               ldn           rb
-              smi           27h                  ; single quote
+              smi           22h                  ; single quote
               bnz           nocconst
               inc           rb
               inc           rb
               lda           rb
-              smi           27h
+              smi           22h
               bnz           nocconstpop
               ldn           rb
               ani           080h 

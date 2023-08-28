@@ -46,7 +46,7 @@ NN - positive number in current BASE
 -NN - negative decimal number (when BASE=10)
 0xNN - unsigned hex number (any BASE; x is not case sensitive)
 0#nn - unsigned decimal number (any BASE)
-'X' - A single ASCII character pushed on the stack
+"X" - A single ASCII character pushed on the stack
 
 #### Arithmetic Operators:
 ```
@@ -81,8 +81,8 @@ ENDIF    ( -- )           - Same as THEN
 >R       (a -- )          - Move top of data stack to return stack
 R>       ( -- a)          - Move top of return stack to data stack
 R@       ( -- a)          - Copy top of return stack to data stack
-[']        ( -- xt)       - Get execution token for next word (ex: ' + )
-EXECUTE  (xt -- )         - Execute xt (see ')
+[']        ( -- xt)       - Get execution token for next word (ex: ['] + )
+EXECUTE  (xt -- )         - Execute xt (see ['])
 EXIT     ( -- )           - Exit current word (see UNLOOP and UNBEGIN)
 UNLOOP   ( -- )           - Remove one level of loop before an EXIT
 QUIT     ( -- )           - Back to top level (no prompt)
@@ -254,7 +254,7 @@ the case conversion. So:
 50 "myword .s
 
 ```
-will fail. Why? Because you just told Forth to find the word .s when the word is actually .S -- this normally works because everything gets shifted, but not after a quote. It will work if you name the word "myword" though.
+will fail. Why? Because you just told Forth to find the word .s when the word is actually .S -- this normally works because everything gets shifted, but not after a quote. It will work if you name the word "myword" though. Because of this, I have changed the character constant to also use a double quote and recommend you don't use quotes for anything else unless you really want to work through it. 
 
 * OPTION is a variable that controls a few optional things. You treat it like any other variable. Currently:
   - Bit 0 - If set, output commands don't put a space after numbers.  For example, if you have two byte variables and try this normally it will look funny:
