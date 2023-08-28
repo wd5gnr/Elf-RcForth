@@ -3723,9 +3723,9 @@ touc:         ldn           rf                   ; check for quote
               bz            touc_dn              ; jump if done
               smi           'a'                  ; check if below lc
               bnf           touc_nxt             ; jump if so
-              smi           27                   ; check upper range
+              smi           26                   ; check upper range
               bdf           touc_nxt             ; jump if above lc
-              adi           'A'+27
+              adi           'A'+26
               str           rf
 touc_nxt:     inc           rf                   ; point to next character
               br            touc                 ; loop to check rest of string

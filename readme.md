@@ -243,6 +243,19 @@ $.       (n -- )                    - Output number n in hex regardless of BASE
 ```
 
 ## Notes
+* There is a slight problem with character constants like 'x'. If you use a lower case letter, it will be converted to uppercase. You can, of course, use the ASCII code for it. All of the case conversion needs overhauling. Even in the original code, if you enter, say:
+```
+: "myword 10 * . ;
+```
+
+It will work, but the name of the word will by "myword not "MYWORD. That seems harmless until you realize that nothing stops
+the case conversion. So:
+```
+50 "myword .s
+
+```
+will fail. Why? Because you just told Forth to find the word .s when the word is actually .S -- this normally works because everything gets shifted, but not after a quote. It will work if you name the word "myword" though.
+
 * OPTION is a variable that controls a few optional things. You treat it like any other variable. Currently:
   - Bit 0 - If set, output commands don't put a space after numbers.  For example, if you have two byte variables and try this normally it will look funny:
   ```
