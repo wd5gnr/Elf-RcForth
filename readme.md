@@ -342,7 +342,7 @@ However, they do work with output. So a possible definition is:
 CREATE MYARRAY 1 , 2 , 3 , 4 ,
 ```
 Note the spaces around the commas and that there is one at the end.
-
+```
 SEE MYARRAY
 VARIABLE MYARRAY
 0x06 ALLOT
