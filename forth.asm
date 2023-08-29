@@ -309,9 +309,9 @@ FQUERY:       equ           FTIB+1
 FEXIT:        equ           FQUERY+1
 FAGAIN:       equ           FEXIT+1
 FQUIT:        equ           FAGAIN+1
-FMOD:         equ           FQUIT+1
+FCREATE:      equ           FQUIT+1
 ; End of list, if adding, update LAST_TOK, below
-LAST_TOK:    equ            FMOD         ; don't forget to change this when adding more tokens      
+LAST_TOK:    equ            FCREATE         ; don't forget to change this when adding more tokens      
 ; special tokens
 T_EOS:        equ           253                  ; end of command line
 T_NUM:        equ           255
@@ -2199,9 +2199,16 @@ ccerr:        lbdf          error                ; jump on error
               call          pop                  ; date data word from stack
               bdf           ccerr                ; jump on error
               br            goodexcl
+ccreate:  ; like variable but with no allocation: CBUFFER only! 
+             ldi           FVARIABLE
+             lskp                   ; skip into cvariable
+
+; ************** WARNING: FALL THOUGH HERE             
 cvariable:    
 #idef USE_CBUFFER
 ; easier.. we just copy the FVARIABLE FASCII String and then bump up two bytes and go
+              ldi           0
+              plo           rf                   ; mark that we are a variable (1=create)
               call          getstream
               ldn           rb                   ; get next byte
               smi           T_ASCII              ; it must be an ascii mark
@@ -2215,6 +2222,11 @@ cvariable:
               plo           r7                   ; R7=start of variable
               inc           r7
               inc           r7                   ; make room for link
+              glo           rf
+              bz            cvarlp
+              str           r7
+              inc           rb
+              inc           r7                   ; replace FCREATE with FVARIABLE
 cvarlp: 
               lda           rb                   ; copy from cbuffer to working memory
               str           r7
@@ -2222,18 +2234,20 @@ cvarlp:
               bnz           cvarlp
               push          rb                   ; RB (on stack)= next input token
                                                  ; R7 = area for variable
+              glo           rf
+              bnz           cvarnospace
               ldi           0 
               str           r7                   ; make sure variable is set to zero (extra feature!)
               inc           r7                   
               str           r7
               inc           r7                   ; R7 now new free pointer
-
+cvarnospace:
               
               ldn           r9                   ; R9 = low byte of freemem
               plo           rf
               dec           r9
               ldn           r9
-              phi          rf
+              phi           rf
               ghi           r7                  ; get memory pointer
               str           rf       
               str           r9
@@ -2668,7 +2682,7 @@ csee_sub:
               smi           86h                  ; check for variable
               lbnz          cseefunc             ; jump if not
               call          f_inmsg
-              db            'VARIABLE ',0
+              db            'CREATE ',0
               inc           r7                   ; skip variable mark
               push          r7
 seevname:
@@ -2681,8 +2695,7 @@ seeveq:
               call          crlfout
               ;  need to see if we need an allot here
               ; if [next]-2 == rb then we do not need it
-              dec           rf
-              dec           rf                   ; next-2
+              ; since we allow CREATE and always use it now we nearly always need an allot
               glo           rf
               str           r2
               glo           rb                   ; (next-2)-dataaddress
@@ -2696,7 +2709,9 @@ seeveq:
               str           r2
               glo           rf
               or
-              bz           seevnoa              ; was equal, jump
+;              bz           seevnoa              ; was equal, jump
+; with create, if we don't need allot then we are done
+              bz            seedone
 seevallot:
               ; ok we need to do the allot here
               push          rb
@@ -2714,11 +2729,17 @@ seevallot:
               call          f_inmsg
               db            'ALLOT',10,13,0
               ;   dump all words (rf has byte count which needs +2 for the original word)
-              inc           rf
-              inc           rf
+;              inc           rf
+;              inc           rf
 ; we should check if the length is odd. If so, we do one C! at the start and the rest we do !
 ; with full words to minimize the amount of data we spit out
               pop           rb                   ; start address
+              ldi           low option+1
+              plo           r9
+              ldn           r9
+              ani           20h    ; option 20h - don't dump data for variables
+              bnz           seedone
+
               ldi           0
               phi           rc
               plo           rc
@@ -2783,6 +2804,7 @@ seecont:
               bnz           seesto
               ghi           rf
               bnz           seesto
+seedone:
               pop           r7
 execdn:       rtn                                ; final CRLF already in place
 seevnoa:
@@ -3012,11 +3034,7 @@ cmul:         call          pop
               lbdf          error                ; jump on error
               call          mul16
               lbr           goodpush
-cmod:         ldi           1
-              lskp
-cdiv:         ldi           0
-              plo           rf
-              call          pop
+cdiv:         call          pop
               lbdf          error                ; jump on error
               mov           r7,rb
               call          pop
@@ -3024,16 +3042,9 @@ cdiv:         ldi           0
               ghi           r9                   ; save our data segment!
               stxd
               call          div16
-              ghi           r9
-              phi           rb                   ; save top of remainder in case we need it
               irx
               ldx
               phi           r9
-              glo           rf
-              bz            cdivr
-            ; mod
-              glo           r9
-              lbr           goodpushb0
 cdivr:        ghi           rc                   ; transfer answer
               phi           rb
               glo           rc
@@ -3190,22 +3201,6 @@ rsp0:
               plo           rb
               lbr           goodpush
 
-
-      
-
-cef:          ldi           0                    ; start with zero
-              phi           rb
-              bn1           cef1                 ; jump if ef1 not on
-              ori           1                    ; signal ef1 is on
-cef1:         bn2           cef2                 ; jump if ef2 ot on
-              ori           2                    ; signal ef2 is on
-cef2:         bn3           cef3                 ; jump if ef3 not on
-              ori           4                    ; signal ef3 is on
-cef3:         bn4           cef4                 ; jump if ef4 not on
-              ori           8
-cef4:
-              lbr           goodpushb0
-
 csp0:         call          getvar
               db            low himem
               ghi           ra
@@ -3235,7 +3230,23 @@ addat:
               adc
               lbr           goodpushb
 crpat:        mov           r8,rstack   
-              br            addat     
+              lbr            addat       
+
+cef:          ldi           0                    ; start with zero
+              phi           rb
+              bn1           cef1                 ; jump if ef1 not on
+              ori           1                    ; signal ef1 is on
+cef1:         bn2           cef2                 ; jump if ef2 ot on
+              ori           2                    ; signal ef2 is on
+cef2:         bn3           cef3                 ; jump if ef3 not on
+              ori           4                    ; signal ef3 is on
+cef3:         bn4           cef4                 ; jump if ef4 not on
+              ori           8
+cef4:
+              lbr           goodpushb0
+
+
+    
 
 cout:         call          pop                  ; value
               lbdf          error                ; jump on error
@@ -3326,13 +3337,14 @@ ccmerr:    lbdf    error               ; jump if error
 cmovelp:   glo     rc
            bnz    cmovestr
            ghi     rc
-           bnz    cmovestr
-           lbr     good
+
+           lbz     good
 cmovestr:  lda     r7
            str     r8
            inc     r8
            dec     rc
            br     cmovelp
+
 
 csetq:        call          pop
               lbdf          error                ; jump if error
@@ -4153,7 +4165,7 @@ cmdtable:     db            'WHIL',('E'+80h)
               db            'EXI',(80h+'T')
               db            'AGAI',(80h+'N')
               db            'QUI',(80h+'T')
-              db            'MO',(80h+'D')
+              db            'CREAT',(80h+'E')
               db            0                    ; no more tokens
 cmdvecs:      dw            cwhile               ; 81h
               dw            crepeat              ; 82h
@@ -4250,7 +4262,7 @@ cmdvecs:      dw            cwhile               ; 81h
               dw            cexit
               dw            cagain
               dw            cquit
-              dw            cmod
+              dw            ccreate
 
 
 

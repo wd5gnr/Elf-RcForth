@@ -270,6 +270,7 @@ will fail. Why? Because you just told Forth to find the word .s when the word is
 
   - Bit 1 - By default, any user words are searched for the last word defined. So you can override a word  with a new definition and restore the old definition with a forget or by restoring ->HERE. If bit 1 is set  the search finds the first word which means you can't really override anything -- storing new definitions  just wastes space. The reason this is important, though, is it is much faster. If you were doing a turnkey  deployment and want better performance and don't plan to override words, you can set this bit in your init   and enjoy faster performance.
   - Bit 2 - When set, writing a hex number out is always 4 digits. By default, values<=255 use two digits and larger numbers use 4 digits.
+  - Bit 5 - If set, SEE and LIST will not dump data for a VARIABLE. They simply show the CREATE and ALLOT to recreate the variable.
   - Bit 6 - This requests a turn off of debug/trace mode (see bit 7)
   - Bit 7 - If bit 7 is set AND you have a defined word of dbg-hook, that word will run before each execution step and gets the address on the stack. You must clean up the stack or bad things will happen. See debug.4th in the examples directory. This is currently largely untested.
   
@@ -338,49 +339,31 @@ However, they do work with output. So a possible definition is:
 ```
 * To create an array, you can use the comma or c, operators. This has changed recently to be more like normal Forth.
 ```
-VARIABLE MYARRAY 1 , 2 , 3 , 4 ,
+CREATE MYARRAY 1 , 2 , 3 , 4 ,
 ```
-Note the spaces around the commas and that there is one at the end which will create one extra cell.
-```
+Note the spaces around the commas and that there is one at the end.
+
 SEE MYARRAY
 VARIABLE MYARRAY
-0x08 ALLOT
+0x06 ALLOT
 0x01 MYARRAY 0x00 + !
 0x02 MYARRAY 0x02 + !
 0x03 MYARRAY 0x04 + !
 0x04 MYARRAY 0x06 + !
-0x00 MYARRAY 0x08 + !
 ```
 You can also use ALLOT but this is now in bytes not words. Use CELLS or just multiply by 2:
 ```
-VARIABLE thing
+VARIABLE THING
 25 CELLS ALLOT
 ```
 Of course, if you want bytes, don't use CELLS. This is a good way to initialize a 
 machine language program:
 ```
-: CSTORE SWAP c! ;
-VARIABLE PGM
-PGM 0x7A c, 0x7B c, 0xD5 CSTORE
+
+CREATE PGM
+0x7A c, 0x7B c, 0xD5 c,
 ```
 Previous code that used word-sized ALLOT will break
-
-C, probably needs some work. Right now it adds 1 byte to the allocation and stores things in the previous byte.
-This is similar to how , works (adds 2 and uses the first 2). However, for a byte, that means the first byte is
-missed. In other words:
-
-```
-VARIABLE FOO 10 c, 20 c, 30 c,
-```
-Produces FOO[0]=? FOO[1]=10, FOO[2]=20, FOO[30=30. This could be a problem if that was machine language code. 
-```
-FOO EXEC
-```
-
-Will be unpredictable. You should exec FOO 1+. You can also treat the first byte special:
-```
-VARIABLE FOO FOO 10 c! 20 c, 30 c, 
-```
 
 
 * Comments and line breaks are not stored
