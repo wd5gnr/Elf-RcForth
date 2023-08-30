@@ -91,6 +91,7 @@ QUIT     ( -- )           - Back to top level (no prompt)
 #### Variables:
 ```
 VARIABLE name                   - Create a variable (not allowed in functions)
+CREATE name                     - Like VARIABLE but no memory allocated (use ALLOT, C, or similar)
 @        (a -- v)               - Retrieve value from address
 SP@      ( -- a)                - Get address of tos pointer
 RP@      ( -- a)                - Get address of return stack
