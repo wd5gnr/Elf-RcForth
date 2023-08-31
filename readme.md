@@ -83,8 +83,8 @@ R>       ( -- a)          - Move top of return stack to data stack
 R@       ( -- a)          - Copy top of return stack to data stack
 [']        ( -- xt)       - Get execution token for next word (ex: ['] + )
 EXECUTE  (xt -- )         - Execute xt (see ['])
-EXIT     ( -- )           - Exit current word (see UNLOOP and UNBEGIN)
-UNLOOP   ( -- )           - Remove one level of loop before an EXIT
+EXIT     ( -- )           - Exit current word (see UNLOOP)
+UNLOOP   ( -- )           - Remove one level of loop/while/begin before an EXIT
 QUIT     ( -- )           - Back to top level (no prompt)
 ```
 
