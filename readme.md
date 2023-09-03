@@ -143,6 +143,7 @@ FORGET name               - Remove a variable or function
 ." text "                 - Print specified text on the terminal
 KEY      ( -- v)          - Read a char from the keyboard and place on stack
 KEY?     ( -- ?)          - Non blocking keyboard read returns 1 if pressed else 0 (does not work with bit-bang serial)
+BRK?     ( -- ?)          - True if break happened (and resets break flag)
 SETQ     (n -- )          - Set Q line hi/lo for n 1/0 
 BASE     ( -- addr)       - Address containing the current numeric radix
 RSEED    ( -- addr)       - Address of 32-bit random number seed
@@ -241,6 +242,7 @@ BASEOUT  (n b --)                   - Output number n in base b (preserves BASE)
 #.       (n -- )                    - Output number n in decimal regardless of BASE
 $.       (n -- )                    - Output number n in hex regardless of BASE
 %.       (n -- )                    - Output number n in binary 
+case?    (v -- l)                   - Used with exit do do case statement
 ```
 
 ## Notes

@@ -23,7 +23,7 @@ VARIABLE LOWG   \ My highest too low guess
           DUP GUESS !                       \ store it for HIGH and LOW to use
           . ." ?" CR ;
 \ start game
-: PLAY
+: PLAY ( -- )
     CLS
     GAMEINIT GAMESO GAMEHELP
     MYGUESS ;
