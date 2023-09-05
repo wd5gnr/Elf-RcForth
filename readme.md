@@ -160,7 +160,7 @@ SETQ     ( x -- )         - Set q to value x
 BYE      ( -- )           - Exit
 NEW      ( -- )           - Wipe dictionary, stack, and reset RNG (careful! no confirmation!)
 .TOK     (t -- )          - Prints name of token T and CR (T must be between 0x80 and to last token; unpredictable if out of range). Mainly to support debugging.
-QUERY    ( a -- )         - Reads line of text to buffer at address a (255 bytes max)
+QUERY    ( ct a -- )         - Reads line of text to buffer at address a (max input ct; 255 bytes max). Buffer contains 3,0 for ^C
 ```
 #### Extended Functions:
 The extended functions are implemented as pre-loaded Forth programs.  As such they
