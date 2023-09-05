@@ -5,12 +5,21 @@ Examples
 
 * Hilo and Hilo2 - Games. Enter play and follow instructions. (Note don't try this in hex mode!)
 
-* biosinput - Example of calling line input/number parse in BIOS
+* Hilomulti - Multiline hilo game
+
+* biosinput - Example of calling line input/number parse in BIOS (see also QUERY)
 
 * Hilo3 - Like Hilo2 but uses bios input
 
+* disasm - 1802 disassembler (shows ['] and case statements)
+ 
+* case - Show off case statement
 
+* dazzle - Show off some LEDs
 
+* fact - Factorial 
+
+* random - Random demo of random numbers
 
 
 About Breakpoints with Exec
