@@ -1,3 +1,14 @@
+; NOTE THIS NOW USES ASM/02 instead of RC/ASM
+; These are backward because there are places in the code where this is the order things are pushed (low first, then high)
+; And either the macros are not used or something is meddling with the items on the stack
+; SCRT does it the other way. I may go clean up the code to reverse it which would require push and pop to flip order but for now...
+.op "push", "N", "8$1 73 9$1 73" 
+.op "pop","N","60 72 B$1 F0 A$1"
+.op "call","W","D4 H1 L1"
+.op "rtn","","D5"
+.op "mov","NR","8$2 A$1 9$2 B$1"
+.op "mov","NW","F8 L2 A$1 F8 H2 B$1"
+
 ; *******************************************************************
 ; *** This software is copyright 2006 by Michael H Riley          ***
 ; *** You have permission to use, modify, copy, and distribute    ***
@@ -57,8 +68,8 @@
               ; complete and doesn't have too much stuff in it, also. As an extra feature, we now
               ; zero out new variables (but not the allot part)s
 
-              ; The old style BLOAD was binary and wipes out your variables
-              ; The new style BLOAD takes text strings (more space) but doesn't wipe out variables
+              ; The old style BLOAD was binary and wipes out your variables (removed)
+              ; The new style BLOAD (EXTLOAD) takes text strings (more space) but doesn't wipe out variables
               ; Of course, you can reduce space on text by easily removing definitions you 
               ; don't want or need which is harder to do with the binary BLOAD
               ; Doesn't need to change based on RAM addresses
@@ -81,34 +92,16 @@
               ; If you turn it back on, you will lose many extended words and you may
               ; have to redo the hex code blocks to work with the current memory layout
 
-   include forthconfig.inc
+#include forthconfig.inc
 
-; Set up stuff based on your choices
-
-#ifndef NO_BLOAD
-#define BLOAD_AUTO
-#else
-#ifdef BLOAD_TEXT
-#undef BLOAD_TEXT
-#endif
-
-#ifdef BLOAD_BIN
-#undef BLOAD_BIN
-#endif
-
-#ifdef BLOAD_AUTO
-#undef BLOAD_AUTO
-#endif
-
-#endif
-
+	
 
 ; For a RAM build you need to set all this up yourself
 ; you do need BIOS somewhere and if you don't have XMODEM then don't use those commands!
 ; we assume you have BIOS.INC (since you have a BIOS) and that it is correct
 #ifdef        RAM
 #define       ANYROM
-#define       CODE          06600h
+#define       FORTH          06600h
 #define       XMODEM        0ed00h
 #define       RAMBASE       0h
               ; [gnr] The UART is used in inkey so when using bitbang, no working KEY?
@@ -124,11 +117,11 @@ xcloser:      equ           XMODEM + 5*3
 exitaddr:     equ           08003h
 ; IMPORTANT. YOUR BIOS WILL REPORT TOO MUCH FREE MEMORY if you are using RAM
 ; So we need an override. This should probably be CODE-1 in most cases
-#define       MEMSIZE_OVERRIDE CODE-1
+#define       MEMSIZE_OVERRIDE FORTH-1
 #endif
 #ifdef        MCHIP
 #define       ANYROM
-#define       CODE          02000h
+#define       FORTH          02000h
 #define       RAMBASE       08000h
 xopenw:       equ           07006h
 xopenr:       equ           07009h
@@ -140,7 +133,7 @@ exitaddr:     equ           07003h
 #endif
 #ifdef        PICOROM
 #define       ANYROM
-#define       CODE          0a000h
+#define       FORTH          0a000h
 #define       RAMBASE       00000h
 xopenw:       equ           08006h
 xopenr:       equ           08009h
@@ -153,8 +146,7 @@ exitaddr:     equ           08003h
 ; [GDJ] build: asm02 -i -L -DSTGROM forth.asm
 #ifdef        STGROM
 #define       ANYROM        1
-              include       config.inc
-#define       CODE          FORTH                ; [gnr] [GDG] ~19 pages w/all extended words
+#include       config.inc
 #define       RAMBASE       00000h
               ; [gnr] The UART is used in inkey so when using bitbang, no inkey!
 #define       UART_SELECT   6                    ; UART register select I/O port
@@ -169,7 +161,7 @@ xcloser:      equ           XMODEM + 5*3
 exitaddr:     equ           08003h
 #endif
 #ifdef        ELFOS
-#define       CODE          02000h
+#define       FORTH          02000h
 stack:        equ           00ffh
 exitaddr:     equ           o_wrmboot
 #else
@@ -192,9 +184,9 @@ option:       equ           basev+2
 storage:      equ           option+2
 stack:        equ           RAMBASE+01ffh
 #endif
-              include       bios.inc
+#include       bios.inc
 #ifdef        ELFOS
-              include       kernel.inc
+#include       kernel.inc
               org           8000h
               lbr           0ff00h
               db            'rcforth',0
@@ -310,19 +302,20 @@ FEXIT:        equ           FQUERY+1
 FAGAIN:       equ           FEXIT+1
 FQUIT:        equ           FAGAIN+1
 FCREATE:      equ           FQUIT+1
+FBRKQ:        equ           FCREATE+1
 ; End of list, if adding, update LAST_TOK, below
-LAST_TOK:    equ            FCREATE         ; don't forget to change this when adding more tokens      
+LAST_TOK:    equ            FBRKQ         ; don't forget to change this when adding more tokens      
 ; special tokens
 T_EOS:        equ           253                  ; end of command line
 T_NUM:        equ           255
 T_ASCII:      equ           254
 
 ; THIS IS THE MAIN PROGRAM (with header if using ELFOS)
-              org           CODE
+              org           FORTH
 #ifdef        ELFOS
               br            start
-              include       date.inc
-              include       build.inc
+#include       date.inc
+#include       build.inc
               db            'Written by Michael H. Riley',0
 #endif
 
@@ -425,10 +418,10 @@ xnew:
               str           rf
               ldi           low option
               plo           rf
-              ldi           high def_option
+              ldi           high DEF_OPTION
               str           rf
               inc           rf
-              ldi           low def_option
+              ldi           low DEF_OPTION
               str           rf
               ; init 32 bit rng seed
  ;             mov           r7, 012A6h
@@ -558,8 +551,14 @@ mainent:
               lsnz                               ; don't do next two increments if mid colon def
               inc           rb
               inc           rb
-#endif              
+#endif  
+              glo           rb 
+              stxd          
+              ghi           rb
+              stxd
               call          exec            
+mainexec:
+              pop           rb  ; order doesn't matter
               lbr           mainlp               ; return to beginning of main loop
 crlfout:
               call          f_inmsg
@@ -796,7 +795,7 @@ findfirst:    ldi          1                     ; remember we found something
               ldn          r9
               ani          2
 #endif              
-              bnz          findsuccess           ; find first instead of last so done!
+              lbnz          findsuccess           ; find first instead of last so done!
               push         rf                    ; old word pointer     
               lbr          findnext     
 
@@ -997,7 +996,7 @@ cquery:
             lbdf            error
             mov             rf,rb
             call            f_input
-            bnf           qgood
+            lbnf           qgood
             mov            rf,rb
             ldi            0
             str            rf
@@ -1207,7 +1206,6 @@ notoken:                                         ; get number BASE [GDJ]
               ani           080h 
               bnz           cconstdn
               ldn           rb   
-#endif                             ;              
               smi           (' '+1)              ; check for whitespace
               bdf           nocconstpop
 cconstdn:
@@ -1224,7 +1222,6 @@ cconstdn:
 
 nocconstpop:  mov           rb,rc
 nocconst:          
-#endif    
               ldn           rb
               smi           '0'
               lbnz           notokenbase          ; if no leading 0 can't be 0x or 0#
@@ -1485,16 +1482,16 @@ exec:
               str           r9                   ; already points to low
               inc           r7
               inc           r7
-              glo           r8
+              glo           r8                  ; PUSH R8 (backwards from SCRT order)
               stxd
               ghi           r8
               stxd
               mov           r8,rb
               mov           rb,rf
-              call          push
+              call          push                ; push RB for exec then reload RB
               mov           rb,r8
               call          exec
-              irx
+              irx                               ; remove old RB
               irx
 #ifdef OPT_BY_CALL
               call         testopt
@@ -1515,7 +1512,7 @@ dbgresume:
               ori          80h 
 dbgreset:              
               str          r9  
-nodebugpop:   pop          rb
+nodebugpop:   pop          rb                     ; restore RB from old R8
 nodebug:              
               ldn           rb                   ; get byte from codestream
               lbz           execdn               ; jump if at end of stream
@@ -1524,7 +1521,7 @@ nodebug:
               call          ismulti
               bz            execnorm
               push          rb
-              glo           rb                   ; save rb
+              glo           rb                   ; save rb (backwards from SCRT order)
               stxd
               ghi           rb
               stxd
@@ -1557,35 +1554,23 @@ execnorm:
               lda           r7                   ; get low byte of vector
               str           r8
               inc           rb                   ; point rb to next command
-              glo           rb                   ; save rb
+              glo           rb                   ; save rb (backward from SCRT order)
               stxd
               ghi           rb
               stxd
               lbr           jump
 
 cexit:
-              irx
-              irx
-              irx
-              ldxa
-              plo          r6
-              ldx
-              phi          r6
-; need to see if we were at top level and if so, bail
-              call        getvar      
-              db          low himem
-              glo         ra
-              str          r2
-              glo          r2
-              sm
-              bnz          cexitdn
-              ghi         ra
-              str         r2
-              ghi         r2
-              sm
-              lbz         mainlp
-cexitdn:                            
-              lbr         good 
+	;;  This is hard to get right and is fragile depending on how exec is called
+	;;  WHen you make a CALL to anything you get the return address in R6 and the previous return address
+	;;  on the top of the stack.
+	;;  However, exec pushes the old RB on the stack so when we get here
+	;; the stack looks like [RB], old ret address
+	irx     ; pop old RB
+	irx
+	rtn     ; return to my caller
+
+
 
 execret:
               plo           r7                   ; save return code
@@ -1627,7 +1612,7 @@ ascnoerr:     inc           r7                   ; point to type
               smi           FCOLON               ; check for function
               lbnz           ascerr               ; jump if not
               glo           r8                   ; save position
-              stxd                               ; and store on stack
+              stxd                               ; and store on stack (backwards from SCRT order)
               ghi           r8
               stxd
               call          exec                 ; call exec to execute stored program
@@ -1958,13 +1943,13 @@ cwords:       call          f_inmsg
               phi           rd
               plo           rd
 cwordslp:     lda           r7                   ; get byte
-              bz            cwordsdn             ; jump if done
+              lbz            cwordsdn             ; jump if done
               plo           rb                   ; save it
               ani           128                  ; check for final of token
               bnz           cwordsf              ; jump if so
               glo           rb                   ; get byte
               call          disp
-              br            cwordslp             ; and loop back
+              lbr            cwordslp             ; and loop back
 cwordsf:      glo           rb                   ; get byte
               ani           07fh                 ; strip high bit
               call          disp
@@ -1972,12 +1957,12 @@ cwordsf:      glo           rb                   ; get byte
               inc           rd
               glo           rd
               smi           12                   ; items per line
-              bnz           cwordslp
+              lbnz           cwordslp
               ldi           0
               phi           rd
               plo           rd
               call          crlfout
-              br            cwordslp             ; and loop back
+              lbr            cwordslp             ; and loop back
 cwordsdn:     call          f_inmsg
               db            10,13,'USER:',10,13,0
               mov           r7,storage
@@ -2086,7 +2071,7 @@ cif:          call          pop
               plo           r7                   ; put into counter
 iflp1:        ldn           rb                   ; get next byte
               smi           FIF                  ; check for IF
-              bnz           ifnotif              ; jump if not
+              lbnz           ifnotif              ; jump if not
               inc           r7                   ; increment if count
 ifcnt:        inc           rb                   ; point to next byte
               lbr            iflp1                ; keep looking
@@ -2246,7 +2231,7 @@ goodexcl:
               str           r7
               lbr           good                 ; and return
 ccat:         call          pop                  ; get address from stack
-              bdf           ccerr                ; jump on error
+              lbdf           ccerr                ; jump on error
               mov           r7,rb
               ldi           0                    ; high byte is zero
               lbr            catcomm
@@ -2262,7 +2247,7 @@ ccreate:  ; like variable but with no allocation: CBUFFER only!
 
 ; ************** WARNING: FALL THOUGH HERE             
 cvariable:    
-#idef USE_CBUFFER
+#ifdef USE_CBUFFER
 ; easier.. we just copy the FVARIABLE FASCII String and then bump up two bytes and go
               ldi           0
               plo           rf                   ; mark that we are a variable (1=create)
@@ -2813,7 +2798,7 @@ seesto:
 ; check for odd count
               glo           rf
               ani           1
-              bz            seeeven
+              lbz            seeeven
               glo           re
               plo           rb                   ; move for
               ldi           0                    ; byte only
@@ -2926,7 +2911,11 @@ seenota:      ldn           r7                   ; reget token
               plo           r7
               inc           r7
               br            seefunclpns          ; next token with no space
-seenotn:      mov           rb,cmdtable
+seenotn:      call          dottok
+              br            seenext              ; jump for next token
+
+
+dottok:       mov           rb,cmdtable
               ldn           r7                   ; get token
               ani           07fh                 ; strip high bit
               plo           r8                   ; token counter
@@ -2946,8 +2935,9 @@ seetoken:     ldn           rb                   ; get byte from token
               br            seetoken             ; and loop til done
 seetklast:    ldn           rb                   ; retrieve byte
               ani           07fh                 ; strip high bit
-              call          disp
-              lbr            seenext              ; jump for next token
+              lbr           disp                 ; display and hidden return 
+
+
 cdotqt:       mov           ra,r2
               inc           ra                   ; point to R[6]
               lda           ra                   ; and retrieve it
@@ -2980,12 +2970,13 @@ ckey:
               ; [GDJ]
 ckeyq:
               ldi           0
-              phi           r7
-              plo           r7
               phi           rb
-              call          inkey
-              glo           r7
+              call          f_utest
+              ldi           0
+              lsnf
+              ldi           1
               lbr           goodpushb0
+
 #ifdef USE_CBUFFER
 ; very simple. Make sure we are in a good place and adjust the here pointer
 callot:       mov           r7,storage
@@ -3265,7 +3256,7 @@ pexcl:        plo           r9
               str           r9
               lbr            good
 
-cspexcl       call          pop       
+cspexcl:      call          pop       
               lbdf          error
               ldi           low fstack
               br            pexcl 
@@ -3468,30 +3459,7 @@ rshiftlp:  ghi     rb
 rshiftret: 
 	   lbr goodpush
 
-;--------------------------------------------------------------
-;    Read byte from UART if char available
-;    return in r7.0 - else return null
-;
-;    from original bios code of Bob Armstrong
-;    modified for non-blocking console input
-;--------------------------------------------------------------
-inkey:        ldi           015h                 ; need UART line status register
-              str           r2                   ; prepare for out
-              out           UART_SELECT          ; write to register select port
-              dec           r2                   ; correct for inc on out
-              inp           UART_DATA            ; read line status register
-              ani           1                    ; mask for data ready bit
-              bz            nokey                ; return if no bytes to read
-              ldi           010h                 ; select data register
-              str           r2                   ; prepare for out
-              out           UART_SELECT          ; write to register select port
-              dec           r2                   ; back to free spot
-              inp           UART_DATA            ; read UART data register
-              plo           r7
-              rtn
-nokey:        ldi           0h
-              plo           r7
-              rtn
+
 
 ; delay for approx 1 millisecond on 4MHz 1802
 cdelay:       call          pop
@@ -3536,28 +3504,8 @@ cexec:        call          pop
               lbr           goodpush
 cexec0:       lbr           jump                 ; transfer to user code. If it returns, it goes back to my caller
 ; -----------------------------------------------------------------------------
-; Load contents of dictionary - any session defined words/values will be zapped (for binary; text doesn't)
+; Load contents of dictionary - 
 ; -----------------------------------------------------------------------------
-#ifdef BLOAD_BIN
-cbload:       push          rf
-              push          rd
-              push          rc
-              mov           rf, extblock         ; source address
-              mov           rd,himem
-              mov           rc, endextblock-extblock  ; block size
-bloadlp:      lda           rf
-              str           rd
-              inc           rd
-              dec           rc
-              glo           rc
-              bnz           bloadlp
-              ghi           rc
-              bnz           bloadlp
-              pop           rc
-              pop           rd
-              pop           rf
-              lbr           mainlp               ; back to main loop
-#endif
 
 #ifdef BLOAD_TEXT
 
@@ -3572,20 +3520,18 @@ cbload2:     ldn           rb
               ;db '.'  ; Just for debugging print a dot for each line loaded
               call          tknizerb
               push          rb
-; RC/ASM doesn't like nested if/else/then so we will comment all of this out
-; If you want to turn off USE_CBUFFER you will have to fix this
-; ifndef USE_CBUFFER
-;              ldi           low freemem
-;              plo           r9
-;              lda           r9
-;              phi           rb
-;              ldn           r9
-;              plo           rb
-;              inc           rb
-;              inc           rb
-; else
+#ifndef USE_CBUFFER
+              ldi           low freemem
+              plo           r9
+              lda           r9
+              phi           rb
+              ldn           r9
+              plo           rb
+              inc           rb
+              inc           rb
+#else
               mov           rb,cbuffer
-; endif                            
+#endif                            
               call          exec
               pop           rb
               inc           rb
@@ -3829,7 +3775,7 @@ typenumx:
               call          f_intout    ; since D=re SCRT will preserve either way
               lbr            typeout
 typenumU:     call          f_uintout   ; since D=re SCRT will preserve either way
-              br            typeout
+              lbr            typeout
 typehex:
               mov           rd,rb
               mov           rf, buffer
@@ -3840,10 +3786,10 @@ typehex:
               ani           4
               lbnz           hex16            ; if option bit 2 set, always do 4 digits
               ghi           rd
-              bz            hexbyte          ; otherwise do 2 digits for byte, 4 digits for word
+              lbz            hexbyte          ; otherwise do 2 digits for byte, 4 digits for word
 hex16:        ghi           rd               ; in case we jumped in
               call          f_hexout4
-              br            typeout
+              lbr            typeout
 hexbyte:      call          f_hexout2
 typeout:      ldi           low option+1
               plo           r9
@@ -3978,7 +3924,7 @@ cdottok:      call         pop
               stxd
               mov          r7,r2
               inc          r7
-              call         seenotn
+              call         dottok
               irx
               irx
               lbr          good
@@ -4105,9 +4051,15 @@ estring:
               plo           rb
               lbr           good              
 
+cbrkq:        ldi           0
+              phi           rb
+              call         f_brktest
+              ldi          0
+              shlc
+              lbr         goodpushb0
 
 
-hello:        db            'Rc/Forth 0.5',0
+hello:        db            'Rc/Forth 0.55',0
 aprompt:      db            ':'                  ; no zero, adds to prompt (must be right before prompt)
 prompt:       db            'ok ',0
 msempty:      db            'stack empty',10,13,0
@@ -4178,7 +4130,7 @@ cmdtable:     db            'WHIL',('E'+80h)
               db            '<',('<'+80h)        ; [GDJ]
               db            '>',('>'+80h)        ; [GDJ]
               db            'DELA',('Y'+80h)     ; [GDJ]
-              db            'BLOA',('D'+80h)     ; [GDJ]
+              db            'EXTLOA',('D'+80h)     ; [GDJ]
               db            'RAN',('D'+80h)      ; [GDJ]
               db            'EXE',('C'+80h)
               db            'LIS',('T'+80h)
@@ -4205,6 +4157,7 @@ cmdtable:     db            'WHIL',('E'+80h)
               db            'AGAI',(80h+'N')
               db            'QUI',(80h+'T')
               db            'CREAT',(80h+'E')
+              db            'BRK',(80h+'?')
               db            0                    ; no more tokens
 cmdvecs:      dw            cwhile               ; 81h
               dw            crepeat              ; 82h
@@ -4302,47 +4255,20 @@ cmdvecs:      dw            cwhile               ; 81h
               dw            cagain
               dw            cquit
               dw            ccreate
+              dw            cbrkq
 
 
 
-#ifdef        STGROM
-#define       EBLOCK 
-#define       STGROMBLOAD  
-#endif
-#ifdef        RAM  
-#define       EBLOCK 
-#define       RAMBLOAD
-#endif
-#ifdef        NO_BLOAD
-#undef        EBLOCK
-#endif
 
 #ifdef BLOAD_TEXT
 loadcore:
-   include extcore.inc
+#include extcore.inc
 loadtext:
-   include extended.inc
+#include extended.inc
 
 
 #endif
 
-; Binary BLOAD is pretty much deprecated so ...
-
-
-;ifdef BLOAD_BIN
-;extblock:
-;endif
-;
-;ifdef        STGROMBLOAD
-;              include       stgrombload.inc
-;endif
-;ifdef        RAMBLOAD
-;              include       rambload.inc
-;endif
-
-;ifdef        BLOAD_BIN
-;endextblock:
-;endif
 endrom:       equ           $
 #ifdef        ELFOS
 rstack:       dw            0

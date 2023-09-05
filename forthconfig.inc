@@ -1,14 +1,22 @@
 ; Configuration items
 
-; pick EXACTLY one of the next three
-; BLOAD_BIN has not been well-maintained so unless you have a very good reason
-; stick with NO_BLOAD or BLOAD_TEXT
+; pick EXACTLY one of the next two
+#ifndef NO_BLOAD
+#ifndef BLOAD_TEXT
 ;#define NO_BLOAD
 #define BLOAD_TEXT
-;#define BLOAD_BIN
+#endif
+#endif
+
+; If you want the entire EXTLOAD/BLOAD words to load on first start up, define this:
+#define BLOAD_AUTO
+; core words always load
+
 
 ; if you want to compile to a separate "compile buffer" define this
+#ifndef NO_USE_CBUFFER
 #define USE_CBUFFER
+#endif
 ; If you turn off CBUFFER and use BLOAD_TEXT, you'll need to uncomment some code in cbload...
 ; Several newer features REQUIRE CBUFFER
 
@@ -18,7 +26,9 @@
 ; Note that you MUST define this to use option 2 below
 ; which allows you to pick find first OR find last, so you really should 
 ; never undef this under normal circumstances
+#ifndef NO_FIND_LAST
 #define FIND_LAST
+#endif
 
 
 ; option bits
@@ -28,7 +38,9 @@
 ; 32 - SEE/LIST do not dump variable data if set
 ; 64 - Turn of debugging
 ; 128 - Turn on debugging
-def_option:    equ 0
+#ifndef DEF_OPTION
+DEF_OPTION:    equ 0
+#endif
 
 
 ; You can choose to only load core ext words into ROM by defining LEAN_EXTENDED

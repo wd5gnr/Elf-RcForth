@@ -1,4 +1,4 @@
-; words uncompressed
+; words uncompressed (not well-maintained!)
 
   db ': +! TUCK @ + SWAP ! ;',0
 ;  db ': -! TUCK @ SWAP - SWAP ! ;',0

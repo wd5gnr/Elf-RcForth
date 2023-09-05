@@ -2,8 +2,8 @@
 
  ## with additions by Al Williams and Glenn Jolly
 
-## Version 0.5
-Last update: 28 Aug 2023
+## Version 0.55
+Last update: 5 Sep 2023
 See [What's New? for news](#new)
 
 ## Contents
@@ -150,7 +150,7 @@ RSEED    ( -- addr)       - Address of 32-bit random number seed
 DELAY    (n --)           - Blocking delay of n milliseconds
 SAVE     ( -- )           - Save dictionary to terminal via Xmodem
 LOAD     ( -- )           - Load dictionary to terminal via Xmodem
-BLOAD    ( -- )           - Load extended words
+EXTLOAD    ( -- )           - Load extended words
 RAND     ( -- b)          - Returns random byte
 EXEC     ( a -- r )       - Do an SCRT call to machine language at address a; Value of RB on return pushed on stack
 OUT      ( b p -- )       - Output byte b to port p (e.g., 4 0xaa out)
@@ -692,7 +692,15 @@ commands and you will find it is really easy to pick it up!
 
 ## New Items
 
-* UNLOOP and UNBEGIN and EXIT -- you need to UNLOOP or UNBEGIN as many levels as you are deep before doing an EXIT
+* ASM/02 used instead of RC/ASM
+
+* EXIT works properly now in all cases tested
+
+* CASE? (see examples)
+
+* BLOAD_BIN removed. BLOAD command renamed for user as EXTLOAD (code still calls it BLOAD)
+
+* UNLOOP and EXIT -- you need to UNLOOP as many levels as you are deep before doing an EXIT
   
 * If you define LEAN_EXTENDED (in extended.inc) you get a smaller number of extended words to save ROM space. You can load the rest later as you desire.
 
