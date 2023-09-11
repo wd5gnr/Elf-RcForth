@@ -24,7 +24,7 @@
 ; FIND_LAST is "better" Forth behavior but very inefficient
 ; Fixing that would require a reorg of the entire dictionary structure
 ; Note that you MUST define this to use option 2 below
-; which allows you to pick find first OR find last, so you really should 
+; which allows you to pick find first OR find last, so you really should
 ; never undef this under normal circumstances
 #ifndef NO_FIND_LAST
 #define FIND_LAST
@@ -32,11 +32,11 @@
 
 
 ; option bits
-; 1 - Set to supress spaces after output number
+; 1 - Set to suppress spaces after output number
 ; 2 - Set to search dictionary for first def instead of last def
 ; 4 - Set to output 4 digit hex numbers always
 ; 32 - SEE/LIST do not dump variable data if set
-; 64 - Turn of debugging
+; 64 - Turn off debugging
 ; 128 - Turn on debugging
 #ifndef DEF_OPTION
 DEF_OPTION:    equ 0
@@ -44,7 +44,7 @@ DEF_OPTION:    equ 0
 
 
 ; You can choose to only load core ext words into ROM by defining LEAN_EXTENDED
-; If you don't do this, you get two bloads where 0 BLOAD loads the core external and 1 BLOAD loads the extended 
+; If you don't do this, you get two bloads where 0 BLOAD loads the core external and 1 BLOAD loads the extended
 ; On startup, both are loaded
 ;#define LEAN_EXTENDED
 
