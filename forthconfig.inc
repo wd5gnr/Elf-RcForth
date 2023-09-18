@@ -1,8 +1,8 @@
 ; Configuration items
 
-; pick EXACTLY one of the next two
 #ifndef NO_BLOAD
 #ifndef BLOAD_TEXT
+; pick EXACTLY one of the next two
 ;#define NO_BLOAD
 #define BLOAD_TEXT
 #endif

@@ -313,10 +313,23 @@ T_ASCII:      equ           254
 ; THIS IS THE MAIN PROGRAM (with header if using ELFOS)
               org           FORTH
 #ifdef        ELFOS
-              br            start
-#include       date.inc
-#include       build.inc
-              db            'Written by Michael H. Riley',0
+           org     2000h-6
+           dw      2000h
+           dw      end-2000h
+           dw      2000h
+
+; RA - text buffer pointer
+; R8 - Reg1 (line number)
+; R9 - Reg2 (count)
+
+           org     2000h
+           br      start
+
+           db      9+80h
+           db      19
+           db      2023
+           dw      100
+           db            'Written by Michael H. Riley',0
 #endif
 
 
@@ -1211,7 +1224,7 @@ notoken:                                         ; get number BASE [GDJ]
               lbnz           nocconstpop
               ldn           rb
               ani           080h 
-              bnz           cconstdn
+              lbnz           cconstdn
               ldn           rb   
               smi           (' '+1)              ; check for whitespace
               lbdf           nocconstpop
@@ -1795,7 +1808,7 @@ goodrpushb0:
               plo           rb
 goodrpush:
               call          rpush
-              br           good
+              lbr           good
 cloop:        call          rpop
               inc           rb                   ; add 1 to it
 loopcnt:      mov           r7,rb
@@ -3185,9 +3198,9 @@ forgetlp:     lda           rb                   ; get byte from higher memory
               inc           r7                   ; point to next position
               dec           r8                   ; decrement the count
               glo           r8                   ; check for zero
-localfglp:    bnz           forgetlp
+localfglp:    lbnz           forgetlp
               ghi           r8
-              bnz           forgetlp
+              lbnz           forgetlp
               dec           r7                   ; move back to freemem position
               dec           r7
               glo           r7                   ; store back into freemem pointer
@@ -3776,7 +3789,7 @@ typenumx:
               plo           r9
               ldn           r9
               smi           10
-              bnz           typehex
+              lbnz           typehex
               mov           rd,rb
               mov           rf, buffer
               glo           re
@@ -3958,7 +3971,7 @@ capos:        call          getstream
               lbz           error
               ldn           rb
               smi           T_ASCII
-              bz            aposstr
+              lbz            aposstr
               ldn           rb
               ani           80h 
               lbz           error         ; what?
@@ -4278,6 +4291,7 @@ loadtext:
 
 #endif
 
+end:	
 endrom:       equ           $
 #ifdef        ELFOS
 rstack:       dw            0
@@ -4286,8 +4300,15 @@ freemem:      dw            storage
 fstack:       dw            0
 himem:        dw            0
 jump:         ds            3
+rseed:	      ds            4
+basev:	      ds	    2
+basen:	      equ	    basev+1
+option:	      ds            2
 fildes:       ds            20
 dta:          ds            512
+#ifdef USE_CBUFFER
+cbuffer:      ds	    256
+#endif	
 buffer:       ds            256
 storage:      dw            0
 #endif
