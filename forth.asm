@@ -200,15 +200,15 @@ stack:        equ           RAMBASE+01ffh
 #include      bios.inc
 #ifdef        ELFOS
 #include      kernel.inc
-              org           8000h
-              lbr           0ff00h
-              db            'rcforth',0
-              dw            9000h
-              dw            endrom+7000h
-              dw            2000h
-              dw            endrom-2000h
-              dw            2000h
-              db            0
+;              org           8000h
+;              lbr           0ff00h
+;              db            'rcforth',0
+;              dw            9000h
+;              dw            endrom+7000h
+;              dw            2000h
+;              dw            endrom-2000h
+;              dw            2000h
+;              db            0
 #endif
 ;  R2   - program stack
 ;  R3   - Main PC
