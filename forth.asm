@@ -4151,7 +4151,7 @@ cmdtable:     db            'WHIL',('E'+80h)
               db            '<',('<'+80h)        ; [GDJ]
               db            '>',('>'+80h)        ; [GDJ]
               db            'DELA',('Y'+80h)     ; [GDJ]
-              db            'EXTLOA',('D'+80h)     ; [GDJ]
+              db            'EXTLOA',('D'+80h)   ; [GDJ]
               db            'RAN',('D'+80h)      ; [GDJ]
               db            'EXE',('C'+80h)
               db            'LIS',('T'+80h)
