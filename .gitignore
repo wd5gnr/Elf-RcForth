@@ -3,6 +3,6 @@
 *.build
 *.lst
 *.hex
+*.bin
 *.elfos
-*.o
 
