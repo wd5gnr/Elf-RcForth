@@ -140,6 +140,18 @@ xclosew:      equ           07012h
 xcloser:      equ           07015h
 exitaddr:     equ           07003h
 #endif
+#ifdef        1802MC
+#include monitor.inc
+#define       ANYROM
+#ifndef       FORTH
+#define       FORTH         0a600h
+#endif
+#ifndef       RAMBASE
+#define       RAMBASE       0100h
+#endif
+exitaddr:     equ           EXIT
+codebase:     equ           FORTH
+#endif
 #ifdef        PICOROM
 #define       ANYROM
 #define       FORTH         0a000h
@@ -200,15 +212,6 @@ stack:        equ           RAMBASE+01ffh
 #include      bios.inc
 #ifdef        ELFOS
 #include      kernel.inc
-;              org           8000h
-;              lbr           0ff00h
-;              db            'rcforth',0
-;              dw            9000h
-;              dw            endrom+7000h
-;              dw            2000h
-;              dw            endrom-2000h
-;              dw            2000h
-;              db            0
 #endif
 ;  R2   - program stack
 ;  R3   - Main PC
@@ -3567,6 +3570,47 @@ cbloaddn:     rtn
 #endif
 
 ; -----------------------------------------------------------------
+#ifdef        1802MC
+csave:        push          rf                   ; save consumed registers
+              push          rc
+              push          ra
+              mov           ra,freemem           ; need pointer to freemem
+              lda           ra                   ; get high address of free memory
+              smi           high himem           ; subtract base address
+              phi           rc                   ; store into count
+              ldn           ra                   ; get low byte of free memory
+              plo           rc                   ; store into count
+              inc           rc                   ; account for terminator
+              inc           rc
+              mov           ra,himem             ; point to forth data
+              dec           ra                   ; save two bytes before
+              dec           ra
+              lda           ra
+              stxd
+              ldn           ra
+              stxd
+              dec           ra                   ; write count before forth data
+              ghi           rc
+              str           ra
+              inc           ra
+              glo           rc
+              str           ra
+              dec           ra
+              inc           rc                   ; add 2 bytes for count
+              inc           rc
+              call          m_save               ; save count and data
+              mov           ra,himem             ; restore saved data
+              dec           ra
+              irx
+              ldxa
+              str           ra
+              dec           ra
+              ldx
+              str           ra
+              pop           ra                   ; recover consumed registers
+              pop           rc
+              lbr           good                 ; all done
+#else
 #ifdef        ANYROM
 csave:        push          rf                   ; save consumed registers
               push          rc
@@ -3589,13 +3633,17 @@ csave:        push          rf                   ; save consumed registers
               mov           rc,2                 ; 2 bytes of length
               call          xwrite
               mov           rf,buffer            ; point to where count is
-              mov           rc,rf
+              lda           rf                   ; retrieve high byte
+              phi           rc                   ; set into count for write
+              ldn           rf                   ; get low byte
+              plo           rc                   ; rc now has count of bytes to save
               mov           rf,himem             ; point to forth data
               call          xwrite
               call          xclosew
               pop           rc                   ; recover consumed registers
               pop           rf
               lbr           good                 ; all done
+#endif
 #endif
 #ifdef        ELFOS
 csave:        mov           ra,r2
@@ -3610,7 +3658,7 @@ csave:        mov           ra,r2
               inc           rb                   ; move into string
               call          setupfd
               mov           rf,rb                ; file name
-              ldi           1                    ; create if nonexistant
+              ldi           1                    ; create if nonexistent
               plo           r7
               call          o_open
               mov           rf, freemem
@@ -3645,6 +3693,28 @@ csave:        mov           ra,r2
               str           rb
               lbr           good                 ; return
 #endif
+#ifdef        1802MC
+cload:        push          ra                   ; save consumed registers
+              mov           ra,himem             ; point to forth data
+              dec           ra                   ; save two bytes before
+              dec           ra
+              lda           ra
+              stxd
+              ldn           ra
+              stxd
+              dec           ra
+              call          m_load
+              mov           ra,himem             ; restore saved data
+              dec           ra
+              irx
+              ldxa
+              str           ra
+              dec           ra
+              ldx
+              str           ra
+              pop           ra                   ; recover consumed registers
+              lbr           mainlp               ; back to main loop
+#else
 #ifdef        ANYROM
 cload:        push          rf                   ; save consumed registers
               push          rc
@@ -3666,6 +3736,7 @@ cload:        push          rf                   ; save consumed registers
               pop           rf
               lbr           mainlp               ; back to main loop
 #endif
+#endif
 #ifdef        ELFOS
 cload:        mov           ra,r2
               inc           ra                   ; point to ra
@@ -3679,7 +3750,7 @@ cload:        mov           ra,r2
               inc           rb                   ; move into string
               call          setupfd
               mov           rf,rb                ; file name
-              ldi           0                    ; create if nonexistant
+              ldi           0                    ; create if nonexistent
               plo           r7
               call          o_open
               lbdf          error                ; jump if file is not opened
